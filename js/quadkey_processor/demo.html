@@ -704,6 +704,10 @@
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Add after Leaflet CSS -->
+    <script src="https://unpkg.com/@mapbox/mapbox-sdk/umd/mapbox-sdk.min.js"></script>
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+    <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.min.js"></script>
     <script>
         // Global variables
         let map;
@@ -725,14 +729,16 @@
         let processedRoadsGeoJSON = null; // Store processed roads GeoJSON
         let query = '';
         const MAPBOX_TOKEN = 'pk.eyJ1Ijoic2NvdHRzZmFybGV5OTMiLCJhIjoiY2o4ODJxNjh4MWVndjJ3cWI5ODRlZ2hnayJ9.w9-dF3jh-GtQzk9h0wBUbw';
-
+        mapboxgl.accessToken = 'pk.eyJ1Ijoic2NvdHRzZmFybGV5OTMiLCJhIjoiY2o4ODJxNjh4MWVndjJ3cWI5ODRlZ2hnayJ9.w9-dF3jh-GtQzk9h0wBUbw'
         // Initialize the map
         function initMap() {
-            map = L.map('map').setView([40.7128, -74.0060], 10);
-
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-            }).addTo(map);
+            const map = new mapboxgl.Map({
+                container: 'map',
+                style: 'mapbox://styles/mapbox/streets-v12',
+                center: [0, 20],
+                zoom: 2,
+                attributionControl: false
+            });
 
             // Add click listener for adding/removing quadkeys
             map.on('click', function(e) {
@@ -740,7 +746,96 @@
                     handleMapClick(e.latlng);
                 }
             });
+           geocoder = new MapboxGeocoder({
+               accessToken: 'pk.eyJ1Ijoic2NvdHRzZmFybGV5OTMiLCJhIjoiY2o4ODJxNjh4MWVndjJ3cWI5ODRlZ2hnayJ9.w9-dF3jh-GtQzk9h0wBUbw',
+               mapboxgl: mapboxgl,
+               marker: false
+             })
+           map.addControl(geocoder, 'top-left');
+            geocoder.on('result', function(e) {
+                const result = e.result;
+                showMunicipalityInfo(result);
+            });
+
+            map.on('load', function() {
+            console.log('Map loaded successfully');
+
+            // Add click handler for the map
+            map.on('click', function(e) {
+                const coordinates = e.lngLat;
+                console.log('Map clicked at:', coordinates);
+            });
+
+                map.addSource('admin-1', {
+              type: 'vector',
+              url: 'mapbox://mapbox.boundaries-adm3-v4',
+              promoteId: 'mapbox_id'
+            });
+             map.addLayer(
+      {
+        id: 'admin-1-fill',
+        type: 'line',
+        source: 'admin-1',
+        'source-layer': 'boundaries_admin_3'
+      },
+      // This final argument indicates that we want to add the Boundaries layer
+      // before the `waterway-label` layer that is in the map from the Mapbox
+      // Light style. This ensures the admin polygons are rendered below any labels
+      'waterway-label'
+    );
+        });
         }
+
+        // Function to display adm3 (municipality) information
+        function showMunicipalityInfo(result) {
+            const context = result.context || [];
+            let municipality = '';
+
+            // Look for administrative level 3 (municipality) or similar
+            context.forEach(item => {
+                // Check for municipality, place, or locality context
+                if (item.id.includes('place') ||
+                    item.id.includes('locality') ||
+                    item.text.toLowerCase().includes('municipality')) {
+                    municipality = item.text;
+                }
+            });
+            console.log(municipality)
+            // If no municipality found, use place name
+            if (!municipality && result.place_name) {
+                const parts = result.place_name.split(',');
+                municipality = parts[0].trim();
+            }
+
+            // Create or update display element
+            let infoDiv = document.getElementById('municipality-info');
+            if (!infoDiv) {
+                infoDiv = document.createElement('div');
+                infoDiv.id = 'municipality-info';
+                infoDiv.className = 'municipality-info';
+                document.querySelector('.left-panel').appendChild(infoDiv);
+            }
+
+            infoDiv.innerHTML = `
+                <div class="municipality-card">
+                    <h3>:round_pushpin: Location Details</h3>
+                    <p><strong>Municipality:</strong> ${municipality || 'Not specified'}</p>
+                    <p><strong>Full Address:</strong> ${result.place_name}</p>
+                    <p><strong>Coordinates:</strong> ${result.geometry.coordinates[1].toFixed(6)}, ${result.geometry.coordinates[0].toFixed(6)}</p>
+                </div>
+            `;
+
+            // Zoom to the result
+            if (result.bbox) {
+                map.fitBounds([
+                    [result.bbox[1], result.bbox[0]],
+                    [result.bbox[3], result.bbox[2]]
+                ]);
+            } else {
+                map.setView([result.geometry.coordinates[1], result.geometry.coordinates[0]], 12);
+            }
+        }
+
 
         // Handle map click for adding/removing quadkeys
         async function handleMapClick(latlng) {
