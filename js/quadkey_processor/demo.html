@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Route Quadkey Processor</title>
+    <title>Quadkey Processor</title>
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
     <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.css" type="text/css">
     <style>
@@ -215,6 +215,7 @@
         .status-message {
             padding: 10px;
             border-radius: 5px;
+            margin-top: 15px;
             margin-bottom: 15px;
             display: none;
         }
@@ -411,6 +412,36 @@
             border-top: 2px solid #e9ecef;
         }
 
+        .tab-container {
+            display: flex;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #eaeaea;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            background: none;
+            border: none;
+            border-bottom: 3px solid transparent;
+            cursor: pointer;
+            color: #666;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .tab.active {
+            color: #3498db;
+            border-bottom-color: #3498db;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
         .csv-info {
             font-size: 0.85em;
             color: #666;
@@ -590,129 +621,170 @@
 <body>
     <div class="container">
         <header>
-            <h1>Route Quadkey Processor</h1>
+            <h1>Quadkey Processor</h1>
         </header>
 
         <div class="main-content">
             <div class="panel left-panel">
-                <h2 class="panel-title">Input & Controls</h2>
+                <div class="tab-container">
+                    <button class="tab active" data-tab="preferences">Settings</button>
+                    <button class="tab" data-tab="route">Route</button>
+                    <button class="tab" data-tab="admin">Admin</button>
+                    <button class="tab" data-tab="csv">CSV</button>
+                </div>
 
-                <div class="input-group">
-                    <label for="searchQuadkey">Quadkey Search (comma-separated for multiple)</label>
-                    <div style="display: flex; gap: 10px;">
-                        <input type="text" id="searchQuadkey" placeholder="Enter quadkeys">
-                        <button id="searchQuadkeyBtn" class="secondary-btn">Search & Zoom</button>
+                <div id="preferences-tab" class="tab-content active">
+                    <div class="input-group">
+                        <label for="searchQuadkey">Quadkey Search (comma-separated for multiple)</label>
+                        <div style="display: flex; gap: 10px;">
+                            <input type="text" id="searchQuadkey" placeholder="Enter quadkeys">
+                            <button id="searchQuadkeyBtn" class="secondary-btn">Search & Zoom</button>
+                        </div>
+                        <div id="searchResult" style="margin-top: 5px; font-size: 0.9rem; color: #666;"></div>
+                        <div id="searchActions" style="margin-top: 10px; display: none;">
+                            <button id="addSearchedQuadkeysBtn" class="secondary-btn" style="margin-right: 10px;margin-bottom: 10px">Add All to Results</button>
+                            <button id="removeSearchedQuadkeysBtn" class="secondary-btn">Remove All from Results</button>
+                        </div>
                     </div>
-                    <div id="searchResult" style="margin-top: 5px; font-size: 0.9rem; color: #666;"></div>
-                    <div id="searchActions" style="margin-top: 10px; display: none;">
-                        <button id="addSearchedQuadkeysBtn" class="secondary-btn" style="margin-right: 10px;margin-bottom: 10px">Add All to Results</button>
-                        <button id="removeSearchedQuadkeysBtn" class="secondary-btn">Remove All from Results</button>
+                    <div class="input-group">
+                        <label for="zoomLevel">Zoom Level (for Quadkey Calculation)</label>
+                        <input type="number" id="zoomLevel" min="1" max="18" value="12">
                     </div>
-                </div>
 
-                <div class="input-group">
-                    <label for="routeFile">Upload Route JSON File</label>
-                    <div class="file-input-container">
-                        <input type="file" id="routeFile" class="file-input" accept=".json">
-                        <label for="routeFile" class="file-input-label" id="fileInputLabel">Choose a JSON file</label>
+                    <div class="input-group">
+                        <label for="processingMode">Attribute</label>
+                        <div id="processingModeContainer">
+                            <select id="processingMode" class="processing-mode-select">
+                                <option value="speed_limits">Speed Limits</option>
+                                <option value="oneways">Oneways</option>
+                                <option value="here_oneways">HERE Oneways</option>
+                            </select>
+                        </div>
                     </div>
-                </div>
 
-                <div class="input-group route-selector" id="routeSelectorContainer" style="display: none;">
-                    <label for="routeSelect">Select Route</label>
-                    <select id="routeSelect"></select>
-                </div>
-
-                <div class="route-controls">
-                    <button id="downloadRouteBtn" class="secondary-btn" disabled>Download Route GeoJSON</button>
-                    <button id="copyWktBtn" class="secondary-btn" disabled>Copy WKT</button>
-                </div>
-
-                <div class="input-group">
-                    <label for="zoomLevel">Zoom Level (for Quadkey Calculation)</label>
-                    <input type="number" id="zoomLevel" min="1" max="18" value="12">
-                </div>
-
-                <div class="input-group">
-                    <label for="processingMode">Attribute</label>
-                    <div id="processingModeContainer">
-                        <select id="processingMode" class="processing-mode-select">
-                            <option value="speed_limits">Speed Limits</option>
-                            <option value="oneways">Oneways</option>
-                            <option value="here_oneways">HERE Oneways</option>
-                        </select>
+                    <div class="map-controls">
+                        <button id="addQuadkeyModeBtn" class="secondary-btn">Add Quadkey Mode</button>
+                        <button id="removeQuadkeyModeBtn" class="secondary-btn">Remove Quadkey Mode</button>
                     </div>
                 </div>
 
-                <div class="map-controls">
-                    <button id="addQuadkeyModeBtn" class="secondary-btn">Add Quadkey Mode</button>
-                    <button id="removeQuadkeyModeBtn" class="secondary-btn">Remove Quadkey Mode</button>
+                <!-- Route Processor Tab -->
+                <div id="route-tab" class="tab-content">
+
+                    <div class="input-group">
+                        <label for="routeFile">Upload Route JSON File</label>
+                        <div class="file-input-container">
+                            <input type="file" id="routeFile" class="file-input" accept=".json">
+                            <label for="routeFile" class="file-input-label" id="fileInputLabel">Choose a JSON file</label>
+                        </div>
+                    </div>
+
+                    <div class="input-group route-selector" id="routeSelectorContainer" style="display: none;">
+                        <label for="routeSelect">Select Route</label>
+                        <select id="routeSelect"></select>
+                    </div>
+
+                    <div class="route-controls">
+                        <button id="downloadRouteBtn" class="secondary-btn" disabled>Download Route GeoJSON</button>
+                        <button id="copyWktBtn" class="secondary-btn" disabled>Copy WKT</button>
+                    </div>
+
+                    <div class="controls">
+                        <button id="processBtn" disabled>Calculate Quadkeys</button>
+                        <button id="downloadGeoJSONBtn" class="secondary-btn" disabled>Download Results GeoJSON</button>
+                    </div>
+
+                    <!-- Country Controls Section -->
+                    <div id="countryControlsContainer" style="display: none;">
+                        <div class="controls-header">
+                            <h3 class="panel-title">Country Controls</h3>
+                            <div class="select-all-buttons">
+                                <button id="selectAllBtn" class="secondary-btn">All</button>
+                                <button id="selectNoneBtn" class="secondary-btn">None</button>
+                            </div>
+                        </div>
+                        <div class="country-controls" id="countryControls">
+                            <!-- Country controls will be dynamically added here -->
+                        </div>
+                    </div>
                 </div>
 
+<!--                <div class="route-info" id="routeInfo" style="display: none;">-->
+<!--                    <p><strong>Route Information</strong></p>-->
+<!--                    <p id="routeDetails"></p>-->
+<!--                </div>-->
+                <div id="admin-tab" class="tab-content">
+                    <div class="csv-section">
+                        <div class="input-group">
+                            <label for="adminLevel">Admin Level</label>
+                            <select id="adminLevel">
+                                <option value="2">Country (level 2)</option>
+                                <option value="4">Region/State (level 4)</option>
+                                <option value="6">County (level 6)</option>
+                                <option value="8" selected>Municipality (level 8)</option>
+                                <option value="9">Local (level 9)</option>
+                                <option value="10">Neighborhood (level 10)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="countryFilter">Country Filter (optional)</label>
+                        <input type="text" id="countryFilter" placeholder="e.g., Spain, France">
+                    </div>
+
+                    <div class="controls">
+                        <button id="queryAdminBtn" class="admin-btn">Query Admin Boundaries</button>
+                        <button id="clearAdminBtn" class="secondary-btn">Clear Admin</button>
+                    </div>
+
+                    <div class="controls">
+                        <button id="splitQuadkeysBtn" class="quadkey-btn">Generate Quadkeys from Selected</button>
+                    </div>
+                </div>
+<!--                <div id="adminInfo" class="info-box admin-info" style="display: none;">-->
+<!--                    <p><strong>Selected Polygon:</strong> <span id="selectedPolygonName">None</span></p>-->
+<!--                    <p><strong>OSM ID:</strong> <span id="selectedPolygonId">-</span></p>-->
+<!--                    <p><strong>Admin Level:</strong> <span id="selectedAdminLevel">-</span></p>-->
+<!--                    <p><strong>Area Quadkeys:</strong> <span id="quadkeyCount">0</span></p>-->
+<!--                </div>-->
+
+                <!-- CSV Upload Section -->
+                <div id="csv-tab" class="tab-content">
+                    <div class="csv-section">
+                        <div class="input-group">
+                            <label for="csvFile">Upload Roads CSV File</label>
+                            <div class="file-input-container">
+                                <input type="file" id="csvFile" class="file-input" accept=".csv">
+                                <label for="csvFile" class="file-input-label" id="csvInputLabel">Choose a Roads CSV file</label>
+                            </div>
+                        </div>
+
+                        <button id="processCSVBtn" class="csv-processing-btn" disabled>Process Roads CSV</button>
+                        <button id="downloadCSVResultsBtn" class="csv-download-btn" disabled>Download Roads GeoJSON</button>
+                    </div>
+
+
+                    <div class="csv-section" style="margin-top: 20px;">
+                        <h3 class="panel-title">Signs CSV Processing</h3>
+
+                        <div class="input-group">
+                            <label for="signsCsvFile">Upload Signs CSV File</label>
+                            <div class="file-input-container">
+                                <input type="file" id="signsCsvFile" class="file-input" accept=".csv">
+                                <label for="signsCsvFile" class="file-input-label" id="signsCsvInputLabel">Choose a Signs CSV file</label>
+                            </div>
+                        </div>
+
+                        <button id="processSignsCSVBtn" class="csv-processing-btn" disabled>Process Signs CSV</button>
+                        <button id="downloadCombinedResultsBtn" class="csv-download-btn" disabled>Download Combined GeoJSON</button>
+                    </div>
+                </div>
                 <div class="status-message" id="statusMessage"></div>
 
                 <div class="loading" id="loadingIndicator">
                     <div class="spinner"></div>
                     <p>Processing route data...</p>
-                </div>
-
-                <div class="route-info" id="routeInfo" style="display: none;">
-                    <p><strong>Route Information</strong></p>
-                    <p id="routeDetails"></p>
-                </div>
-
-                <div class="controls">
-                    <button id="processBtn" disabled>Calculate Quadkeys</button>
-                    <button id="downloadGeoJSONBtn" class="secondary-btn" disabled>Download Results GeoJSON</button>
-                </div>
-
-                <!-- Country Controls Section -->
-                <div id="countryControlsContainer" style="display: none;">
-                    <div class="controls-header">
-                        <h3 class="panel-title">Country Controls</h3>
-                        <div class="select-all-buttons">
-                            <button id="selectAllBtn" class="secondary-btn">All</button>
-                            <button id="selectNoneBtn" class="secondary-btn">None</button>
-                        </div>
-                    </div>
-                    <div class="country-controls" id="countryControls">
-                        <!-- Country controls will be dynamically added here -->
-                    </div>
-                </div>
-
-                <div class="stats-info" id="statsInfo" style="display: none;">
-                    <p><strong>Processing Statistics</strong></p>
-                    <p id="statsDetails"></p>
-                </div>
-
-                <!-- CSV Upload Section -->
-                <div class="csv-section">
-                    <h3 class="panel-title">Roads CSV Processing</h3>
-
-                    <div class="input-group">
-                        <label for="csvFile">Upload Roads CSV File</label>
-                        <div class="file-input-container">
-                            <input type="file" id="csvFile" class="file-input" accept=".csv">
-                            <label for="csvFile" class="file-input-label" id="csvInputLabel">Choose a Roads CSV file</label>
-                        </div>
-                    </div>
-
-                    <button id="processCSVBtn" class="csv-processing-btn" disabled>Process Roads CSV</button>
-                    <button id="downloadCSVResultsBtn" class="csv-download-btn" disabled>Download Roads GeoJSON</button>
-                </div>
-                <div class="csv-section" style="margin-top: 20px;">
-                    <h3 class="panel-title">Signs CSV Processing</h3>
-
-                    <div class="input-group">
-                        <label for="signsCsvFile">Upload Signs CSV File</label>
-                        <div class="file-input-container">
-                            <input type="file" id="signsCsvFile" class="file-input" accept=".csv">
-                            <label for="signsCsvFile" class="file-input-label" id="signsCsvInputLabel">Choose a Signs CSV file</label>
-                        </div>
-                    </div>
-
-                    <button id="processSignsCSVBtn" class="csv-processing-btn" disabled>Process Signs CSV</button>
-                    <button id="downloadCombinedResultsBtn" class="csv-download-btn" disabled>Download Combined GeoJSON</button>
                 </div>
             </div>
             <div class="panel">
@@ -741,6 +813,7 @@
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
     <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v5.0.0/mapbox-gl-geocoder.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src='https://unpkg.com'></script>
     <script>
         // Global variables
         let map;
@@ -759,8 +832,22 @@
         let csvRoadsData = [];
         let processedRoadsGeoJSON = null;
         let query = '';
+        let selectedAdminPolygon = []
         const MAPBOX_TOKEN = 'pk.eyJ1Ijoic2NvdHRzZmFybGV5OTMiLCJhIjoiY2o4ODJxNjh4MWVndjJ3cWI5ODRlZ2hnayJ9.w9-dF3jh-GtQzk9h0wBUbw';
         mapboxgl.accessToken = MAPBOX_TOKEN;
+
+        // Admin elements
+        const queryAdminBtn = document.getElementById('queryAdminBtn');
+        const clearAdminBtn = document.getElementById('clearAdminBtn');
+        const splitQuadkeysBtn = document.getElementById('splitQuadkeysBtn');
+        const adminInfo = document.getElementById('adminInfo');
+        const selectedPolygonName = document.getElementById('selectedPolygonName');
+        const selectedPolygonId = document.getElementById('selectedPolygonId');
+        const selectedAdminLevel = document.getElementById('selectedAdminLevel');
+        const quadkeyCount = document.getElementById('quadkeyCount');
+
+        const tabs = document.querySelectorAll('.tab');
+        const tabContents = document.querySelectorAll('.tab-content');
 
         // Map layers management
         let mapLayers = {
@@ -788,7 +875,7 @@
                 accessToken: mapboxgl.accessToken,
                 mapboxgl: mapboxgl,
                 marker: false,
-                placeholder: 'Search for city, town, or municipality...',
+                placeholder: 'Search',
                 countries: '',
                 types: 'place,locality,neighborhood,address,region',
                 bbox: [-180, -90, 180, 90]
@@ -803,6 +890,353 @@
             geocoder.on('result', function(e) {
                 const result = e.result;
             });
+        }
+
+        // ==================== TAB MANAGEMENT ====================
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabId = tab.getAttribute('data-tab');
+                currentTab = tabId;
+
+                // Update tabs
+                tabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+
+                // Update tab contents
+                tabContents.forEach(content => {
+                    content.classList.remove('active');
+                    if (content.id === `${tabId}-tab`) {
+                        content.classList.add('active');
+                    }
+                });
+            });
+        });
+
+        // ==================== ADMIN BOUNDARIES ====================
+        queryAdminBtn.addEventListener('click', queryAdminBoundaries);
+        clearAdminBtn.addEventListener('click', clearAdminBoundaries);
+        splitQuadkeysBtn.addEventListener('click', generateQuadkeysFromPolygon);
+
+        async function queryAdminBoundaries() {
+            const adminLevel = document.getElementById('adminLevel').value;
+            const countryFilter = document.getElementById('countryFilter').value;
+
+            const bbox = getCurrentBbox();
+            let query = `[out:json][timeout:90];
+(
+  relation["boundary"="administrative"]["admin_level"="${adminLevel}"](${bbox});
+`;
+
+            if (countryFilter) {
+                const countries = countryFilter.split(',').map(c => c.trim());
+                countries.forEach(country => {
+                    query += `  relation["boundary"="administrative"]["admin_level"="${adminLevel}"]["name"="${country}"](${bbox});\n`;
+                });
+            }
+
+            query += `);
+(._;>;);
+out body;
+>;
+out skel qt;`;
+
+            try {
+                const encodedQuery = encodeURIComponent(query);
+                const response = await fetch(
+                    `https://overpass-api.de/api/interpreter?data=${encodedQuery}`
+                );
+
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                const osmData = await response.json();
+                processAdminData(osmData, adminLevel);
+
+            } catch (error) {
+                showStatus(`Error fetching boundaries: ${error.message}`, 'error');
+            }
+        }
+
+        function processAdminData(osmData, adminLevel) {
+            const nodes = {};
+            const ways = {};
+            const relations = {};
+            // Build lookup tables
+            osmData.elements.forEach(element => {
+                switch (element.type) {
+                    case 'node':
+                        nodes[element.id] = [element.lon, element.lat];
+                        break;
+                    case 'way':
+                        ways[element.id] = element;
+                        break;
+                    case 'relation':
+                        relations[element.id] = element;
+                        break;
+                }
+            });
+
+            // Process each relation
+            adminFeatures = [];
+
+            Object.values(relations).forEach(relation => {
+                if (!relation.tags || relation.tags.boundary !== 'administrative') return;
+
+                const relationFeatures = processRelation(relation, ways, nodes);
+                if (relationFeatures) {
+                    adminFeatures.push(...relationFeatures);
+                }
+            });
+
+            console.log(`Processed ${adminFeatures.length} admin polygons`);
+            showStatus(`Found ${adminFeatures.length} admin boundaries`, 'success');
+
+            displayAdminBoundaries();
+            updateStats();
+        }
+
+        function processRelation(relation, ways, nodes) {
+            if (!relation.members) return null;
+
+            const outerSegments = [];
+            const innerSegments = [];
+
+            relation.members.forEach(member => {
+                if (member.type === 'way' && ways[member.ref]) {
+                    const way = ways[member.ref];
+                    const coords = way.nodes
+                        .map(nodeId => nodes[nodeId])
+                        .filter(coord => coord !== undefined);
+
+                    if (coords.length > 1) {
+                        if (member.role === 'outer') {
+                            outerSegments.push({
+                                coords: coords,
+                                first: coords[0],
+                                last: coords[coords.length - 1]
+                            });
+                        } else if (member.role === 'inner') {
+                            innerSegments.push({
+                                coords: coords,
+                                first: coords[0],
+                                last: coords[coords.length - 1]
+                            });
+                        }
+                    }
+                }
+            });
+
+            if (outerSegments.length === 0) return null;
+
+            const outerRings = connectSegments(outerSegments);
+            const innerRings = connectSegments(innerSegments);
+
+            const features = [];
+
+            outerRings.forEach((outerRing, index) => {
+                const belongingInnerRings = innerRings.filter(innerRing =>
+                    isPointInPolygon(innerRing[0], outerRing)
+                );
+
+                const coordinates = [outerRing];
+                belongingInnerRings.forEach(innerRing => {
+                    coordinates.push(innerRing);
+                });
+
+                features.push({
+                    type: 'Feature',
+                    properties: {
+                        name: relation.tags.name || relation.tags['name:es'] || 'Unnamed',
+                        admin_level: relation.tags.admin_level,
+                        osm_id: relation.id,
+                        osm_type: 'relation',
+                        part_index: index,
+                        total_parts: outerRings.length,
+                        isClicked: false,
+                        isHighlighted: false,
+                        ...relation.tags
+                    },
+                    geometry: {
+                        type: 'Polygon',
+                        coordinates: coordinates
+                    }
+                });
+            });
+
+            return features;
+        }
+
+        function displayAdminBoundaries() {
+            if (adminFeatures.length === 0) {
+                showStatus('No admin boundaries to display', 'info');
+                return;
+            }
+
+            // Clear existing admin layers
+            if (map.getSource('admin-boundaries')) {
+                map.removeLayer('admin-boundaries-fill');
+                map.removeLayer('admin-boundaries-outline');
+                map.removeSource('admin-boundaries');
+            }
+
+            const geoJson = {
+                type: 'FeatureCollection',
+                features: adminFeatures
+            };
+
+            map.addSource('admin-boundaries', {
+                type: 'geojson',
+                data: geoJson
+            });
+
+            // Add fill layer
+            map.addLayer({
+                id: 'admin-boundaries-fill',
+                type: 'fill',
+                source: 'admin-boundaries',
+                paint: {
+                    'fill-color': [
+                        'case',
+                        ['==', ['get', 'isClicked'], true], '#FFE66D',
+                        ['==', ['get', 'isHighlighted'], true], '#FF6B6B',
+                        '#4ECDC4'
+                    ],
+                    'fill-opacity': [
+                        'case',
+                        ['==', ['get', 'isClicked'], true], 0.8,
+                        ['==', ['get', 'isHighlighted'], true], 0.6,
+                        0.4
+                    ],
+                    'fill-outline-color': '#333'
+                }
+            });
+
+            // Add outline layer
+            map.addLayer({
+                id: 'admin-boundaries-outline',
+                type: 'line',
+                source: 'admin-boundaries',
+                paint: {
+                    'line-color': [
+                        'case',
+                        ['==', ['get', 'isClicked'], true], '#333',
+                        ['==', ['get', 'isHighlighted'], true], '#C44569',
+                        '#333'
+                    ],
+                    'line-width': [
+                        'case',
+                        ['==', ['get', 'isClicked'], true], 3,
+                        ['==', ['get', 'isHighlighted'], true], 2,
+                        1
+                    ],
+                    'line-opacity': 0.8
+                }
+            });
+
+            setupAdminInteractions();
+        }
+
+        function setupAdminInteractions() {
+            map.off('click', 'admin-boundaries-fill');
+            map.off('mouseenter', 'admin-boundaries-fill');
+            map.off('mouseleave', 'admin-boundaries-fill');
+
+            map.on('click', 'admin-boundaries-fill', (e) => {
+                if (e.features.length === 0) return;
+
+                const clickedFeature = e.features[0];
+                const clickedName = clickedFeature.properties.name;
+                const clickedId = clickedFeature.id;
+
+                console.log(`Clicked: ${clickedName} (ID: ${clickedId})`);
+
+                // Update all features
+                adminFeatures.forEach(feature => {
+                    feature.properties.isClicked = false;
+                    feature.properties.isHighlighted = false;
+
+                    if (feature.properties.name === clickedName) {
+                        if (feature.properties.osm_id === clickedFeature.properties.osm_id &&
+                            feature.properties.part_index === clickedFeature.properties.part_index) {
+                            feature.properties.isClicked = true;
+                        } else {
+                            feature.properties.isHighlighted = true;
+                        }
+                        selectedAdminPolygon.push(feature);
+                    }
+                });
+
+                // Update source
+                const source = map.getSource('admin-boundaries');
+                if (source) {
+                    const updatedGeoJson = {
+                        type: 'FeatureCollection',
+                        features: adminFeatures
+                    };
+                    source.setData(updatedGeoJson);
+                }
+
+                // Update UI
+                updateAdminInfo(clickedFeature);
+                splitQuadkeysBtn.disabled = false;
+                currentHighlightName = clickedName;
+
+                // Show info
+                const sameNameCount = adminFeatures.filter(f =>
+                    f.properties.name === clickedName
+                ).length;
+
+                showStatus(`Selected ${clickedName} (${sameNameCount} polygons)`, 'success');
+                updateStats();
+            });
+
+            map.on('mouseenter', 'admin-boundaries-fill', () => {
+                map.getCanvas().style.cursor = 'pointer';
+            });
+
+            map.on('mouseleave', 'admin-boundaries-fill', () => {
+                map.getCanvas().style.cursor = '';
+            });
+        }
+
+        function updateAdminInfo(feature) {
+            selectedPolygonName.textContent = feature.properties.name;
+            selectedPolygonId.textContent = feature.properties.osm_id;
+            selectedAdminLevel.textContent = feature.properties.admin_level;
+            adminInfo.style.display = 'block';
+        }
+
+        function clearAdminBoundaries() {
+            if (map.getSource('admin-boundaries')) {
+                map.removeLayer('admin-boundaries-fill');
+                map.removeLayer('admin-boundaries-outline');
+                map.removeSource('admin-boundaries');
+            }
+
+            if (map.getSource('admin-quadkeys')) {
+                map.removeLayer('admin-quadkeys');
+                map.removeSource('admin-quadkeys');
+            }
+
+            adminFeatures = [];
+            generatedQuadkeys = [];
+            selectedAdminPolygon = [];
+            adminInfo.style.display = 'none';
+            splitQuadkeysBtn.disabled = true;
+        }
+
+        async function bindQuadkeyToCountry(qk) {
+            const countries = await getQuadkeyCountries(qk);
+            if (countries.length > 1) {
+                showCountrySelectionModal(qk, countries, 'add');
+            } else {
+                addQuadkey(qk, countries);
+                updateDisplayAndVisualization();
+                recalculateStatistics();
+
+                if (currentCountryQuadkeys) {
+                    createCountryControls(currentCountryQuadkeys, true);
+                }
+            }
         }
 
         // Handle map click
@@ -1760,6 +2194,10 @@
             mapLayers.quadkeys.clear();
         }
 
+        document.getElementById('zoomLevel').addEventListener('click', function() {
+            currentZoomLevel = document.getElementById('zoomLevel').value;
+        })
+
         // Copy results to clipboard
         document.getElementById('copyResultsBtn').addEventListener('click', function() {
             const resultsText = document.getElementById('resultsOutput').textContent;
@@ -2070,6 +2508,341 @@
 
             showStatus('Ready. Upload a route file to begin.', 'info');
         });
+
+        function getCurrentBbox() {
+            const bounds = map.getBounds();
+            return `${bounds.getSouth()},${bounds.getWest()},${bounds.getNorth()},${bounds.getEast()}`;
+        }
+
+        function pointsEqual(p1, p2) {
+            return Math.abs(p1[0] - p2[0]) < 0.000001 &&
+                   Math.abs(p1[1] - p2[1]) < 0.000001;
+        }
+
+        function isPointInPolygon(point, polygon) {
+            let inside = false;
+            for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+                const xi = polygon[i][0], yi = polygon[i][1];
+                const xj = polygon[j][0], yj = polygon[j][1];
+
+                const intersect = ((yi > point[1]) !== (yj > point[1])) &&
+                    (point[0] < (xj - xi) * (point[1] - yi) / (yj - yi) + xi);
+                if (intersect) inside = !inside;
+            }
+            return inside;
+        }
+
+        function connectSegments(segments) {
+            if (segments.length === 0) return [];
+            if (segments.length === 1) {
+                const ring = segments[0].coords;
+                if (!pointsEqual(ring[0], ring[ring.length - 1])) {
+                    ring.push([ring[0][0], ring[0][1]]);
+                }
+                return [ring];
+            }
+
+            const rings = [];
+            const used = new Set();
+
+            while (used.size < segments.length) {
+                let startIdx = -1;
+                for (let i = 0; i < segments.length; i++) {
+                    if (!used.has(i)) {
+                        startIdx = i;
+                        break;
+                    }
+                }
+
+                if (startIdx === -1) break;
+
+                const start = segments[startIdx];
+                let ring = [...start.coords];
+                used.add(startIdx);
+                let currentEnd = start.last;
+
+                let found;
+                do {
+                    found = false;
+                    for (let i = 0; i < segments.length; i++) {
+                        if (used.has(i)) continue;
+
+                        const seg = segments[i];
+
+                        if (pointsEqual(currentEnd, seg.first)) {
+                            ring.push(...seg.coords.slice(1));
+                            currentEnd = seg.last;
+                            used.add(i);
+                            found = true;
+                            break;
+                        } else if (pointsEqual(currentEnd, seg.last)) {
+                            ring.push(...seg.coords.slice(0, -1).reverse());
+                            currentEnd = seg.first;
+                            used.add(i);
+                            found = true;
+                            break;
+                        }
+                    }
+                } while (found);
+
+                if (!pointsEqual(ring[0], ring[ring.length - 1])) {
+                    ring.push([ring[0][0], ring[0][1]]);
+                }
+
+                rings.push(ring);
+            }
+
+            return rings;
+        }
+
+        function updateStats() {
+<!--            statsQuadkeys.textContent = generatedQuadkeys.length + routeQuadkeys.length;-->
+<!--            statsSelected.textContent = selectedAdminPolygon ? selectedAdminPolygon.properties.name : 'None';-->
+        }
+
+<!--        function filterQuadkeysInSelectedPolygons(polygon, qk){-->
+<!--            bboxIntersectsPolygon(polygon, qk);-->
+<!--        }-->
+
+        // ==================== QUADKEY GENERATION ====================
+        function generateQuadkeysFromPolygon() {
+            if (!selectedAdminPolygon) {
+                return;
+            }
+            const zoomLevel = currentZoomLevel;
+            let tmp = new Set();
+            for (let poly_index = 0; poly_index < selectedAdminPolygon.length; poly_index++){
+                const polygon = selectedAdminPolygon[poly_index].geometry;
+                console.log(polygon)
+                // Get bounding box of polygon
+                const bbox = getPolygonBbox(polygon);
+
+                // Generate quadkeys for the bounding box
+                const quadkeys = generateQuadkeysForBbox(bbox, zoomLevel);
+
+                quadkeys.forEach(qk => {
+                    if (intersects(bbox, polygon.coordinates[0])){
+                        tmp.add(qk);
+                        bindQuadkeyToCountry(qk);
+                    }
+                });
+                //Filter quadkeys that are inside the polygon
+                //const filteredQuadkeys = filterQuadkeysByPolygon(quadkeys, polygon, zoomLevel);
+
+                //generatedQuadkeys = filteredQuadkeys;
+            }
+            console.log(tmp)
+            // Display quadkeys on map
+            //displayAdminQuadkeys([...tmp], zoomLevel);
+
+            // Update UI
+            //quadkeyCount.textContent = quadkeys.length;
+            //updateAdminResults(filteredQuadkeys);
+        }
+
+        /**
+         * SAT-based intersection test (works for convex polygons)
+         */
+        function intersects(bbox, polygon) {
+            const [xmin, ymin, xmax, ymax] = bbox;
+
+            // Convert bbox to polygon
+            const bboxPoly = [
+                [xmin, ymin],
+                [xmax, ymin],
+                [xmax, ymax],
+                [xmin, ymax]
+            ];
+
+            // Get axes to test (normals of all edges)
+            const axes = [];
+
+            // Add bbox normals
+            axes.push([1, 0]);  // x-axis (horizontal edges)
+            axes.push([0, 1]);  // y-axis (vertical edges)
+
+            // Add polygon normals
+            for (let i = 0; i < polygon.length; i++) {
+                const p1 = polygon[i];
+                const p2 = polygon[(i + 1) % polygon.length];
+
+                const edge = [p2[0] - p1[0], p2[1] - p1[1]];
+                const normal = [-edge[1], edge[0]]; // perpendicular
+                axes.push(normalize(normal));
+            }
+
+            // Test all axes for separation
+            for (const axis of axes) {
+                const [ax, ay] = axis;
+
+                // Project bbox onto axis
+                let bboxMin = Infinity, bboxMax = -Infinity;
+                for (const [x, y] of bboxPoly) {
+                    const projection = x * ax + y * ay;
+                    bboxMin = Math.min(bboxMin, projection);
+                    bboxMax = Math.max(bboxMax, projection);
+                }
+
+                // Project polygon onto axis
+                let polyMin = Infinity, polyMax = -Infinity;
+                for (const [x, y] of polygon) {
+                    const projection = x * ax + y * ay;
+                    polyMin = Math.min(polyMin, projection);
+                    polyMax = Math.max(polyMax, projection);
+                }
+
+                // Check for separation
+                if (bboxMax < polyMin || bboxMin > polyMax) {
+                    return false; // Found a separating axis
+                }
+            }
+
+            return true; // No separating axis found
+        }
+
+        function normalize(vector) {
+            const [x, y] = vector;
+            const length = Math.sqrt(x * x + y * y);
+            if (length === 0) return [0, 0];
+            return [x / length, y / length];
+        }
+
+        let united_features = new Set();
+
+        function displayAdminQuadkeys(quadkeys, zoom) {
+            // Clear existing admin quadkey layer
+            if (map.getSource('admin-quadkeys')) {
+                map.removeLayer('admin-quadkeys');
+                map.removeSource('admin-quadkeys');
+            }
+            const features = quadkeys.map(quadkey => {
+                const bbox = quadkeyToBbox(quadkey, zoom);
+                return {
+                    type: 'Feature',
+                    properties: { quadkey: quadkey, source: 'admin' },
+                    geometry: {
+                        type: 'Polygon',
+                        coordinates: [[
+                            [bbox[0], bbox[1]],
+                            [bbox[2], bbox[1]],
+                            [bbox[2], bbox[3]],
+                            [bbox[0], bbox[3]],
+                            [bbox[0], bbox[1]]
+                        ]]
+                    }
+                };
+            });
+
+            const geoJson = {
+                type: 'FeatureCollection',
+                features: features
+            };
+            map.addSource('admin-quadkeys', {
+                type: 'geojson',
+                data: geoJson
+            });
+
+            map.addLayer({
+                id: 'admin-quadkeys',
+                type: 'fill',
+                source: 'admin-quadkeys',
+                paint: {
+                    'fill-color': '#e74c3c',
+                    'fill-opacity': 0.3,
+                    'fill-outline-color': '#c0392b'
+                }
+            });
+        }
+
+        function getPolygonBbox(polygon) {
+            let minLng = Infinity, minLat = Infinity;
+            let maxLng = -Infinity, maxLat = -Infinity;
+
+            polygon.coordinates[0].forEach(coord => {
+                const [lng, lat] = coord;
+                minLng = Math.min(minLng, lng);
+                minLat = Math.min(minLat, lat);
+                maxLng = Math.max(maxLng, lng);
+                maxLat = Math.max(maxLat, lat);
+            });
+
+            return [minLng, minLat, maxLng, maxLat];
+        }
+
+        function generateQuadkeysForBbox(bbox, zoom) {
+            const [minLng, minLat, maxLng, maxLat] = bbox;
+            const quadkeys = new Set();
+
+            // Convert to tile coordinates
+            const minTile = lngLatToTile(minLng, minLat, zoom);
+            const maxTile = lngLatToTile(maxLng, maxLat, zoom);
+
+            minTile_x = Math.min(minTile.x, maxTile.x)
+            minTile_y = Math.min(minTile.y, maxTile.y)
+            maxTile_x = Math.max(minTile.x, maxTile.x)
+            maxTile_y = Math.max(minTile.y, maxTile.y)
+
+            for (let x = minTile_x; x <= maxTile_x; x++) {
+                for (let y = minTile_y; y <= maxTile_y; y++) {
+                    const quadkey = tileToQuadkey(x, y, zoom);
+                    quadkeys.add(quadkey);
+                }
+            }
+            return Array.from(quadkeys);
+        }
+
+        function filterQuadkeysByPolygon(quadkeys, polygon, zoom) {
+            return quadkeys.filter(quadkey => {
+                const bbox = quadkeyToBbox(quadkey, zoom);
+                const tileCenter = [
+                    (bbox[0] + bbox[2]) / 2,
+                    (bbox[1] + bbox[3]) / 2
+                ];
+                return isPointInPolygon(tileCenter, polygon.coordinates[0]);
+            });
+        }
+
+        // ==================== QUADKEY UTILITIES ====================
+        function lngLatToTile(lng, lat, zoom) {
+            const x = Math.floor((lng + 180) / 360 * Math.pow(2, zoom));
+            const y = Math.floor((1 - Math.log(Math.tan(lat * Math.PI / 180) +
+                1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * Math.pow(2, zoom));
+            return { x, y };
+        }
+
+        function tileToQuadkey(x, y, zoom) {
+            let quadkey = '';
+            for (let i = zoom; i > 0; i--) {
+                let digit = 0;
+                const mask = 1 << (i - 1);
+                if ((x & mask) !== 0) digit += 1;
+                if ((y & mask) !== 0) digit += 2;
+                quadkey += digit;
+            }
+            return quadkey;
+        }
+
+        function quadkeyToBbox(quadkey, zoom) {
+            let x = 0, y = 0;
+            for (let i = zoom; i > 0; i--) {
+                const mask = 1 << (i - 1);
+                const digit = parseInt(quadkey[zoom - i]);
+                if ((digit & 1) !== 0) x |= mask;
+                if ((digit & 2) !== 0) y |= mask;
+            }
+
+            const n = Math.pow(2, zoom);
+            const lon1 = x / n * 360 - 180;
+            const lat1 = radToDeg(Math.atan(Math.sinh(Math.PI * (1 - 2 * y / n))));
+            const lon2 = (x + 1) / n * 360 - 180;
+            const lat2 = radToDeg(Math.atan(Math.sinh(Math.PI * (1 - 2 * (y + 1) / n))));
+
+            return [lon1, lat2, lon2, lat1];
+        }
+
+        function radToDeg(rad) {
+            return rad * 180 / Math.PI;
+        }
     </script>
 </body>
 </html>
