@@ -1224,19 +1224,21 @@ out skel qt;`;
             splitQuadkeysBtn.disabled = true;
         }
 
-        async function bindQuadkeyToCountry(qk) {
-            const countries = await getQuadkeyCountries(qk);
-            if (countries.length > 1) {
-                showCountrySelectionModal(qk, countries, 'add');
-            } else {
-                addQuadkey(qk, countries);
-                updateDisplayAndVisualization();
-                recalculateStatistics();
-
-                if (currentCountryQuadkeys) {
-                    createCountryControls(currentCountryQuadkeys, true);
+        async function bindQuadkeyToCountry(qks) {
+            await qks.reduce(async (prevPromise, qk) => {
+                await prevPromise;
+                const countries = await getQuadkeyCountries(qk);
+                if (countries.length > 1) {
+                    showCountrySelectionModal(qk, countries, 'add');
+                } else {
+                    addQuadkey(qk, countries);
+                    if (currentCountryQuadkeys) {
+                        createCountryControls(currentCountryQuadkeys, true);
+                    }
                 }
-            }
+            }, Promise.resolve());
+            updateDisplayAndVisualization();
+            recalculateStatistics();
         }
 
         // Handle map click
@@ -2369,8 +2371,11 @@ out skel qt;`;
             return accept;
         }
 
+        let currentFilteredCountryQuadkeys = null;
+
         // Display results
         function displayResults(countryQuadkeys) {
+            currentFilteredCountryQuadkeys = countryQuadkeys;
             const firstRoutePoint = getFirstRoutePoint();
             const sortedCountries = Object.keys(countryQuadkeys).sort();
             let output = '';
@@ -2435,6 +2440,16 @@ out skel qt;`;
                     finalCountryCondition = '(' + countryConditions.join(' or ') + ')';
                 }
             }
+<!--            let polygonCondition = '';-->
+<!--            if (selectedAdminPolygon){-->
+<!--                console.log(selectedAdminPolygon);-->
+<!--                for (let poly = 0; poly < selectedAdminPolygon.length; poly++){-->
+<!--                    let base = `and st_intersects(-->
+<!--                        st_geometryfromtext(geometry_wkt,-->
+<!--                                            ${coordinatesToWktPolygon(selectedAdminPolygon[poly].geometry.coordinates[0])}))`;-->
+<!--                    polygonCondition += base;-->
+<!--                }-->
+<!--            }-->
 
             // Build the complete query
             query = `select id, tags, geometry_wkt, metadata_str['iso:3166_1'] as country
@@ -2604,34 +2619,72 @@ out skel qt;`;
 <!--            bboxIntersectsPolygon(polygon, qk);-->
 <!--        }-->
 
+
+        function coordinatesToWktPolygon(coords) {
+            // WKT requires longitude first, then latitude
+            const swappedCoords = coords.map(coord => `${coord[0]} ${coord[1]}`);
+            const coordsString = swappedCoords.join(',');
+            return `POLYGON((${coordsString}))`;
+        }
+
+
+        function clearAdminQuadkeys() {
+            const allLayers = map.getStyle().layers;
+
+            // 2. Iterate and remove if name matches
+            allLayers.forEach(layer => {
+              console.log(layer.id);
+<!--              if (layer.id === layerNameToRemove) {-->
+<!--                map.removeLayer(layer.id);-->
+<!--                console.log(`Removed layer: ${layer.id}`);-->
+<!--              }-->
+            })
+        }
+
         // ==================== QUADKEY GENERATION ====================
         function generateQuadkeysFromPolygon() {
+            clearQuadkeyLayers();
             if (!selectedAdminPolygon) {
                 return;
             }
             const zoomLevel = currentZoomLevel;
             let tmp = new Set();
+            clearAdminQuadkeys();
             for (let poly_index = 0; poly_index < selectedAdminPolygon.length; poly_index++){
                 const polygon = selectedAdminPolygon[poly_index].geometry;
-                console.log(polygon)
                 // Get bounding box of polygon
                 const bbox = getPolygonBbox(polygon);
 
                 // Generate quadkeys for the bounding box
                 const quadkeys = generateQuadkeysForBbox(bbox, zoomLevel);
-
                 quadkeys.forEach(qk => {
-                    if (intersects(bbox, polygon.coordinates[0])){
+<!--                    if (!mapLayers.quadkeys.has(qk)) {-->
+<!--                        mapLayers.quadkeys.set(qk, []);-->
+<!--                        const layerId = `quadkey-layer-${qk}`;-->
+<!--                        mapLayers.quadkeys.get(qk).push(layerId + '-fill', layerId + '-outline');-->
+<!--                    }-->
+
+                    const qk_bbox = quadkeyToBbox(qk, zoomLevel);
+                    const bboxCoordinates = [[
+                        [qk_bbox[0], qk_bbox[1]],
+                        [qk_bbox[2], qk_bbox[1]],
+                        [qk_bbox[2], qk_bbox[3]],
+                        [qk_bbox[0], qk_bbox[3]],
+                        [qk_bbox[0], qk_bbox[1]]
+                    ]]
+                    if (intersects(qk_bbox, polygon.coordinates[0])){
                         tmp.add(qk);
-                        bindQuadkeyToCountry(qk);
+                    }else{
+                        console.log('not intersects')
                     }
                 });
+                bindQuadkeyToCountry([...tmp]);
                 //Filter quadkeys that are inside the polygon
                 //const filteredQuadkeys = filterQuadkeysByPolygon(quadkeys, polygon, zoomLevel);
 
                 //generatedQuadkeys = filteredQuadkeys;
             }
-            console.log(tmp)
+            //console.log(tmp)
             // Display quadkeys on map
             //displayAdminQuadkeys([...tmp], zoomLevel);
 
@@ -2640,71 +2693,183 @@ out skel qt;`;
             //updateAdminResults(filteredQuadkeys);
         }
 
-        /**
-         * SAT-based intersection test (works for convex polygons)
-         */
         function intersects(bbox, polygon) {
             const [xmin, ymin, xmax, ymax] = bbox;
 
-            // Convert bbox to polygon
-            const bboxPoly = [
+            // Fast bounding box check
+            if (!bboxIntersectsPolygonBbox(bbox, polygon)) {
+                return false;
+            }
+
+            // Check if any polygon vertex is inside bbox
+            for (const [x, y] of polygon) {
+                if (x >= xmin && x <= xmax && y >= ymin && y <= ymax) {
+                    return true;
+                }
+            }
+
+            // Check if any bbox corner is inside polygon
+            const bboxCorners = [
                 [xmin, ymin],
                 [xmax, ymin],
                 [xmax, ymax],
                 [xmin, ymax]
             ];
 
-            // Get axes to test (normals of all edges)
-            const axes = [];
+            for (const [x, y] of bboxCorners) {
+                if (pointInPolygon(x, y, polygon)) {
+                    return true;
+                }
+            }
 
-            // Add bbox normals
-            axes.push([1, 0]);  // x-axis (horizontal edges)
-            axes.push([0, 1]);  // y-axis (vertical edges)
+            // Check for edge intersections
+            return edgesIntersect(bbox, polygon);
+        }
 
-            // Add polygon normals
+        /**
+         * Fast bounding box intersection check
+         */
+        function bboxIntersectsPolygonBbox(bbox, polygon) {
+            const [xmin, ymin, xmax, ymax] = bbox;
+
+            // Compute polygon's bounding box
+            let polyMinX = Infinity, polyMinY = Infinity;
+            let polyMaxX = -Infinity, polyMaxY = -Infinity;
+
+            for (const [x, y] of polygon) {
+                polyMinX = Math.min(polyMinX, x);
+                polyMinY = Math.min(polyMinY, y);
+                polyMaxX = Math.max(polyMaxX, x);
+                polyMaxY = Math.max(polyMaxY, y);
+            }
+
+            // Check if bounding boxes overlap
+            return !(xmax < polyMinX || xmin > polyMaxX ||
+                     ymax < polyMinY || ymin > polyMaxY);
+        }
+
+        /**
+         * Robust point-in-polygon test (winding number algorithm)
+         */
+        function pointInPolygon(x, y, polygon) {
+            let wn = 0; // Winding number
+
+            for (let i = 0; i < polygon.length; i++) {
+                const [x1, y1] = polygon[i];
+                const [x2, y2] = polygon[(i + 1) % polygon.length];
+
+                // Check if point is on vertex
+                if (x === x1 && y === y1) {
+                    return true;
+                }
+
+                // Check if point is on horizontal segment
+                if (y1 === y2 && y === y1 && x > Math.min(x1, x2) && x < Math.max(x1, x2)) {
+                    return true;
+                }
+
+                // Check if point is above/below the segment
+                if (y1 <= y) {
+                    if (y2 > y && isLeft(x1, y1, x2, y2, x, y) > 0) {
+                        wn++;
+                    }
+                } else {
+                    if (y2 <= y && isLeft(x1, y1, x2, y2, x, y) < 0) {
+                        wn--;
+                    }
+                }
+            }
+
+            return wn !== 0;
+        }
+
+        /**
+         * Check if edges intersect
+         */
+        function edgesIntersect(bbox, polygon) {
+            const [xmin, ymin, xmax, ymax] = bbox;
+
+            // Create bbox edges
+            const bboxEdges = [
+                [[xmin, ymin], [xmax, ymin]], // bottom
+                [[xmax, ymin], [xmax, ymax]], // right
+                [[xmax, ymax], [xmin, ymax]], // top
+                [[xmin, ymax], [xmin, ymin]]  // left
+            ];
+
+            // Check each polygon edge against each bbox edge
             for (let i = 0; i < polygon.length; i++) {
                 const p1 = polygon[i];
                 const p2 = polygon[(i + 1) % polygon.length];
 
-                const edge = [p2[0] - p1[0], p2[1] - p1[1]];
-                const normal = [-edge[1], edge[0]]; // perpendicular
-                axes.push(normalize(normal));
-            }
-
-            // Test all axes for separation
-            for (const axis of axes) {
-                const [ax, ay] = axis;
-
-                // Project bbox onto axis
-                let bboxMin = Infinity, bboxMax = -Infinity;
-                for (const [x, y] of bboxPoly) {
-                    const projection = x * ax + y * ay;
-                    bboxMin = Math.min(bboxMin, projection);
-                    bboxMax = Math.max(bboxMax, projection);
-                }
-
-                // Project polygon onto axis
-                let polyMin = Infinity, polyMax = -Infinity;
-                for (const [x, y] of polygon) {
-                    const projection = x * ax + y * ay;
-                    polyMin = Math.min(polyMin, projection);
-                    polyMax = Math.max(polyMax, projection);
-                }
-
-                // Check for separation
-                if (bboxMax < polyMin || bboxMin > polyMax) {
-                    return false; // Found a separating axis
+                for (const [b1, b2] of bboxEdges) {
+                    if (segmentIntersectsSegment(p1, p2, b1, b2)) {
+                        return true;
+                    }
                 }
             }
 
-            return true; // No separating axis found
+            return false;
         }
 
-        function normalize(vector) {
-            const [x, y] = vector;
-            const length = Math.sqrt(x * x + y * y);
-            if (length === 0) return [0, 0];
-            return [x / length, y / length];
+        /**
+         * Check if two segments intersect
+         */
+        function segmentIntersectsSegment(a, b, c, d) {
+            const [ax, ay] = a;
+            const [bx, by] = b;
+            const [cx, cy] = c;
+            const [dx, dy] = d;
+
+            // Check if segments share an endpoint
+            if ((ax === cx && ay === cy) || (ax === dx && ay === dy) ||
+                (bx === cx && by === cy) || (bx === dx && by === dy)) {
+                return true;
+            }
+
+            const orient1 = orientation(ax, ay, bx, by, cx, cy);
+            const orient2 = orientation(ax, ay, bx, by, dx, dy);
+            const orient3 = orientation(cx, cy, dx, dy, ax, ay);
+            const orient4 = orientation(cx, cy, dx, dy, bx, by);
+
+            // General case
+            if (orient1 !== orient2 && orient3 !== orient4) {
+                return true;
+            }
+
+            // Special cases (collinear)
+            if (orient1 === 0 && onSegment(ax, ay, cx, cy, bx, by)) return true;
+            if (orient2 === 0 && onSegment(ax, ay, dx, dy, bx, by)) return true;
+            if (orient3 === 0 && onSegment(cx, cy, ax, ay, dx, dy)) return true;
+            if (orient4 === 0 && onSegment(cx, cy, bx, by, dx, dy)) return true;
+
+            return false;
+        }
+
+        /**
+         * Helper: orientation of three points
+         * Returns: 0=collinear, 1=clockwise, 2=counterclockwise
+         */
+        function orientation(px, py, qx, qy, rx, ry) {
+            const val = (qy - py) * (rx - qx) - (qx - px) * (ry - qy);
+
+            if (Math.abs(val) < 1e-10) return 0; // Using epsilon for floating point
+            return val > 0 ? 1 : 2;
+        }
+
+        /**
+         * Helper: check if point q lies on segment pr
+         */
+        function onSegment(px, py, qx, qy, rx, ry) {
+            return qx <= Math.max(px, rx) && qx >= Math.min(px, rx) &&
+                   qy <= Math.max(py, ry) && qy >= Math.min(py, ry);
+        }
+
+        /**
+         * Helper: left test for winding number algorithm
+         */
+        function isLeft(x1, y1, x2, y2, x, y) {
+            return (x2 - x1) * (y - y1) - (x - x1) * (y2 - y1);
         }
 
         let united_features = new Set();
@@ -2843,6 +3008,128 @@ out skel qt;`;
         function radToDeg(rad) {
             return rad * 180 / Math.PI;
         }
+
+        function generateRoadsSQL(countryQuadkeys) {
+            const firstRoutePoint = getFirstRoutePoint();
+            const sortedCountries = Object.keys(countryQuadkeys).sort();
+            const currentDate = new Date();
+            currentDate.setDate(currentDate.getDate() - 2);
+            const formattedDate = currentDate.toLocaleDateString('en-CA');
+            let strFormattedDate = `'${formattedDate}'`;
+
+            // Build country-specific conditions
+            let countryConditions = [];
+
+            for (const country of sortedCountries) {
+                const quadkeys = countryQuadkeys[country];
+
+                // Sort quadkeys by distance from first route point
+                const sortedQuadkeys = quadkeys.map(quadkey => {
+                    const bounds = quadkeyToBounds(quadkey);
+                    const centerLat = (bounds.north + bounds.south) / 2;
+                    const centerLng = (bounds.west + bounds.east) / 2;
+                    const distance = calculateDistance(
+                        [firstRoutePoint.lat, firstRoutePoint.lng],
+                        [centerLat, centerLng]
+                    );
+                    return { quadkey, distance };
+                }).sort((a, b) => a.distance - b.distance)
+                  .map(item => item.quadkey);
+
+                // Group quadkeys by zoom level for this country
+                const quadkeysByZoom = {};
+                for (let qk of sortedQuadkeys) {
+                    const zoomLevel = qk.length;
+                    if (zoomLevel in quadkeysByZoom) {
+                        quadkeysByZoom[zoomLevel].push(qk);
+                    } else {
+                        quadkeysByZoom[zoomLevel] = [qk];
+                    }
+                }
+
+                // Build cardinality condition for this country
+                let cardinalityCondition = '';
+                for (const [zoom, qks] of Object.entries(quadkeysByZoom)) {
+                    let quads = getQkStringifyArray(qks);
+                    cardinalityCondition += `cardinality(filter(metadata_array['quadkey_z${zoom}'], x -> x in (${quads})))>0 or `;
+                }
+
+                if (cardinalityCondition) {
+                    cardinalityCondition = cardinalityCondition.slice(0, -4);
+                    // Create country-specific condition
+                    const countryCondition = `(metadata_str['iso:3166_1'] = '${country}' and (${cardinalityCondition}))`;
+                    countryConditions.push(countryCondition);
+                }
+            }
+
+            let finalCountryCondition = '';
+            if (countryConditions.length > 0) {
+                if (countryConditions.length === 1) {
+                    finalCountryCondition = countryConditions[0];
+                } else {
+                    finalCountryCondition = '(' + countryConditions.join(' or ') + ')';
+                }
+            }
+
+            // Build the complete query with appropriate fields based on mode
+            let selectFields = `select id, tags, geometry_wkt, metadata_str['iso:3166_1'] as country`;
+            let endFields = '';
+            if (currentProcessingMode === 'speed_limits' || currentProcessingMode === 'here_oneways') {
+                endFields = `tags['highway'] in ('motorway', 'trunk', 'motorway_link', 'trunk_link', 'primary', 'primary_link', 'secondary', 'secondary_link', 'tertiary', 'unclassified', 'residential', 'tertiary_link')`;
+            } else if (currentProcessingMode === 'oneways'){
+                endFields = `tags['highway'] in ('unclassified', 'residential', 'living_street')`;
+            }
+            let polygonCondition = '';
+            if (selectedAdminPolygon){
+                console.log(selectedAdminPolygon);
+                for (let poly = 0; poly < selectedAdminPolygon.length; poly++){
+                    let base = `and st_intersects(
+                        st_geometryfromtext(geometry_wkt),
+                        st_geometryfromtext('${coordinatesToWktPolygon(selectedAdminPolygon[poly].geometry.coordinates)}'))\n\t\t`;
+                    polygonCondition += base;
+                }
+            }
+            return `${selectFields}
+                from roads_production.road_pipeline_corrections_v1_1_0_metadata_corrected_osm_roads_enriched
+                where dt = ${strFormattedDate}
+                and ${finalCountryCondition}
+                ${polygonCondition}
+                and ${endFields}`;
+        }
+
+        // Copy SQL results to clipboard
+        document.getElementById('copySqlResultsBtn').addEventListener('click', function() {
+            if (!currentFilteredCountryQuadkeys && (!currentCountryQuadkeys || Object.keys(currentCountryQuadkeys).length === 0)) {
+                showStatus('No quadkey data available. Please add quadkeys first.', 'error');
+                return;
+            }
+
+            try {
+                let roadsSQL;
+                   if (currentProcessingMode === 'here_oneways'){
+                       roadsSQL = generateHereRoadsSQL(currentFilteredCountryQuadkeys || currentCountryQuadkeys || {});
+                   } else{
+                       roadsSQL = generateRoadsSQL(currentFilteredCountryQuadkeys || currentCountryQuadkeys || {});
+                   }
+                navigator.clipboard.writeText(roadsSQL).then(() => {
+                    showStatus('Roads SQL copied to clipboard!', 'success');
+                }).catch(err => {
+                    console.error('Copy failed:', err);
+                    // Fallback for older browsers
+                    const textArea = document.createElement('textarea');
+                    textArea.value = roadsSQL;
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                    showStatus('Roads SQL copied to clipboard!', 'success');
+                });
+            } catch (error) {
+                showStatus(`Error generating roads SQL: ${error.message}`, 'error');
+                console.error(error);
+            }
+        });
+
     </script>
 </body>
 </html>
