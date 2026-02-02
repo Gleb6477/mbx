@@ -616,6 +616,25 @@
                 box-shadow: 0 0 0 0 rgba(255, 0, 0, 0);
             }
         }
+
+        #statsResults {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+
+        #statsResults pre {
+            font-size: 12px;
+            max-height: 300px;
+        }
+
+        .btn {
+            margin-right: 5px;
+            margin-bottom: 5px;
+        }
+
+        .card {
+            margin-top: 20px;
+        }
     </style>
 </head>
 <body>
@@ -800,6 +819,10 @@
                             <button id="copyResultsBtn" class="secondary-btn" style="margin-left:20px" disabled>Copy Results</button>
                             <button id="copySqlResultsBtn" class="secondary-btn" style="margin-left:10px" disabled>Copy roads SQL</button>
                             <button id="copySignsSqlBtn" class="secondary-btn" style="margin-left:10px" disabled>Copy signs SQL</button>
+                            <button id="copyStats" class="secondary-btn" style="margin-left:10px">
+                                <i class="fas fa-chart-bar"></i> Calculate Statistics
+                            </button>
+<!--                            <div id="statsResults" class="mt-3"></div>-->
                         </div>
                     </div>
                     <div class="results-content" id="resultsOutput">
@@ -912,6 +935,87 @@
             });
         });
 
+        // Function to calculate statistics
+<!--async function calculateGeojsonsStatistics() {-->
+<!--    const quadKeyStats = {};-->
+
+<!--    // Loop through all processed quadkeys-->
+<!--    for (const quadKey of Object.keys(stats)) {-->
+<!--        const data = stats[quadKey];-->
+<!--        let roadLength = 0;-->
+<!--        let signCount = 0;-->
+
+<!--        // Calculate statistics for each feature-->
+<!--        data.features.forEach(feature => {-->
+<!--            if (feature.properties.layer === 'roads' ||-->
+<!--                feature.properties.highway ||-->
+<!--                feature.properties.layer === 'road' ||-->
+<!--                feature.geometry.type === 'LineString') {-->
+<!--                // It's a road-->
+<!--                roadLength += calculateLineLength(feature.geometry.coordinates);-->
+<!--            } else if (feature.properties.highway === 'traffic_signals' ||-->
+<!--                      feature.properties.traffic_sign ||-->
+<!--                      feature.properties.layer === 'signs' ||-->
+<!--                      feature.geometry.type === 'Point') {-->
+<!--                // It's a sign-->
+<!--                signCount++;-->
+<!--            }-->
+<!--        });-->
+
+<!--        quadKeyStats[quadKey] = {-->
+<!--            roadLength: roadLength,-->
+<!--            signCount: signCount-->
+<!--        };-->
+<!--    }-->
+
+<!--    // Sort by road length descending-->
+<!--    const sortedStats = Object.entries(quadKeyStats)-->
+<!--        .sort(([, a], [, b]) => b.roadLength - a.roadLength);-->
+
+<!--    // Generate CSV-->
+<!--    let csvContent = "QuadKey,Road Length (m),Sign Count,Total Features\n";-->
+<!--    sortedStats.forEach(([quadKey, stats]) => {-->
+<!--        csvContent += `${quadKey},${stats.roadLength.toFixed(2)},${stats.signCount}\n`;-->
+<!--    });-->
+
+<!--    // Display results-->
+<!--    const statsResults = document.getElementById('statsResults');-->
+<!--    statsResults.innerHTML = `-->
+<!--        <div class="card">-->
+<!--            <div class="card-header">-->
+<!--                <h5 class="mb-0">QuadKey Statistics (Sorted by Road Length)</h5>-->
+<!--            </div>-->
+<!--            <div class="card-body">-->
+<!--                <pre class="bg-light p-3">${csvContent}</pre>-->
+<!--                <button id="downloadStats" class="btn btn-success">-->
+<!--                    <i class="fas fa-download"></i> Download CSV-->
+<!--                </button>-->
+<!--            </div>-->
+<!--        </div>-->
+<!--    `;-->
+
+<!--    // Add download functionality-->
+<!--    document.getElementById('downloadStats').addEventListener('click', () => {-->
+<!--        downloadCSV(csvContent, 'quadkey_statistics.csv');-->
+<!--    });-->
+<!--}-->
+
+// Helper function to download CSV
+function downloadCSV(content, filename) {
+    const blob = new Blob([content], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+}
+
+<!--// Add event listener for the statistics button-->
+<!--document.getElementById('calculateStats').addEventListener('click', calculateGeojsonsStatistics);-->
+
         // ==================== ADMIN BOUNDARIES ====================
         queryAdminBtn.addEventListener('click', queryAdminBoundaries);
         clearAdminBtn.addEventListener('click', clearAdminBoundaries);
@@ -922,23 +1026,22 @@
             const countryFilter = document.getElementById('countryFilter').value;
 
             const bbox = getCurrentBbox();
-            let query = `[out:json][timeout:90];
-(
-  relation["boundary"="administrative"]["admin_level"="${adminLevel}"](${bbox});
-`;
 
+            let query = `[out:json][timeout:90];
+            (
+              relation["boundary"="administrative"]["admin_level"="${adminLevel}"](${bbox});
+            `;
             if (countryFilter) {
                 const countries = countryFilter.split(',').map(c => c.trim());
                 countries.forEach(country => {
                     query += `  relation["boundary"="administrative"]["admin_level"="${adminLevel}"]["name"="${country}"](${bbox});\n`;
                 });
             }
-
             query += `);
-(._;>;);
-out body;
->;
-out skel qt;`;
+            (._;>;);
+            out body;
+            >;
+            out skel qt;`;
 
             try {
                 const encodedQuery = encodeURIComponent(query);
@@ -1141,6 +1244,7 @@ out skel qt;`;
             map.off('mouseleave', 'admin-boundaries-fill');
 
             map.on('click', 'admin-boundaries-fill', (e) => {
+                if (removeQuadkeyMode) return;
                 if (e.features.length === 0) return;
 
                 const clickedFeature = e.features[0];
@@ -1369,6 +1473,482 @@ out skel qt;`;
 
             const wktCoordinates = allCoords.map(coord => `${coord[0]} ${coord[1]}`).join(', ');
             return `LINESTRING (${wktCoordinates})`;
+        }
+
+                // Calculate intersection length between a complete line and a quadkey bounds
+        function calculateIntersectionLength(lineCoordinates, quadkeyBounds) {
+            // Check if any part of the line intersects with the bounds
+            let totalIntersectionLength = 0;
+
+            for (let i = 1; i < lineCoordinates.length; i++) {
+                const segmentStart = lineCoordinates[i - 1];
+                const segmentEnd = lineCoordinates[i];
+
+                // Check if this segment intersects with bounds
+                if (lineSegmentIntersectsBounds(segmentStart, segmentEnd, quadkeyBounds)) {
+                    // Calculate the clipped segment length
+                    const clippedSegment = clipSegmentToBounds(segmentStart, segmentEnd, quadkeyBounds);
+                    if (clippedSegment) {
+                        const [lon1, lat1] = clippedSegment[0];
+                        const [lon2, lat2] = clippedSegment[1];
+
+                        // Calculate distance
+                        const R = 6371000;
+                        const φ1 = lat1 * Math.PI / 180;
+                        const φ2 = lat2 * Math.PI / 180;
+                        const Δφ = (lat2 - lat1) * Math.PI / 180;
+                        const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+                        const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                                 Math.cos(φ1) * Math.cos(φ2) *
+                                 Math.sin(Δλ/2) * Math.sin(Δλ/2);
+                        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+                        totalIntersectionLength += R * c;
+                    }
+                }
+            }
+
+            return totalIntersectionLength;
+        }
+
+                // Clip a line segment to bounds (returns the portion of segment inside bounds)
+        function clipSegmentToBounds(coord1, coord2, bounds) {
+            let [x1, y1] = coord1;
+            let [x2, y2] = coord2;
+
+            // Cohen-Sutherland line clipping algorithm
+            const INSIDE = 0;
+            const LEFT = 1;
+            const RIGHT = 2;
+            const BOTTOM = 4;
+            const TOP = 8;
+
+            function computeOutCode(x, y) {
+                let code = INSIDE;
+
+                if (x < bounds.west) code |= LEFT;
+                else if (x > bounds.east) code |= RIGHT;
+                if (y < bounds.south) code |= BOTTOM;
+                else if (y > bounds.north) code |= TOP;
+
+                return code;
+            }
+
+            let outcode1 = computeOutCode(x1, y1);
+            let outcode2 = computeOutCode(x2, y2);
+            let accept = false;
+
+            while (true) {
+                if (!(outcode1 | outcode2)) {
+                    // Both points inside - accept the whole segment
+                    accept = true;
+                    break;
+                } else if (outcode1 & outcode2) {
+                    // Both points outside on same side - reject
+                    break;
+                } else {
+                    // Some part is inside - clip
+                    let x, y;
+                    const outcodeOut = outcode1 ? outcode1 : outcode2;
+
+                    if (outcodeOut & TOP) {
+                        // Point is above the clip rectangle
+                        x = x1 + (x2 - x1) * (bounds.north - y1) / (y2 - y1);
+                        y = bounds.north;
+                    } else if (outcodeOut & BOTTOM) {
+                        // Point is below the clip rectangle
+                        x = x1 + (x2 - x1) * (bounds.south - y1) / (y2 - y1);
+                        y = bounds.south;
+                    } else if (outcodeOut & RIGHT) {
+                        // Point is to the right of clip rectangle
+                        y = y1 + (y2 - y1) * (bounds.east - x1) / (x2 - x1);
+                        x = bounds.east;
+                    } else if (outcodeOut & LEFT) {
+                        // Point is to the left of clip rectangle
+                        y = y1 + (y2 - y1) * (bounds.west - x1) / (x2 - x1);
+                        x = bounds.west;
+                    }
+
+                    if (outcodeOut === outcode1) {
+                        x1 = x;
+                        y1 = y;
+                        outcode1 = computeOutCode(x1, y1);
+                    } else {
+                        x2 = x;
+                        y2 = y;
+                        outcode2 = computeOutCode(x2, y2);
+                    }
+                }
+            }
+
+            if (accept) {
+                return [[x1, y1], [x2, y2]];
+            }
+            return null;
+        }
+
+        function createSignFeature(sign, country, quadkey) {
+    let maxspeedValue = '';
+
+    if (currentProcessingMode === 'speed_limits') {
+        // Speed Limits mode: rename detection_type to maxspeed
+        if (sign.detection_type) {
+            if (!sign.detection_type.toLowerCase().startsWith("speed_limit")) {
+                maxspeedValue = sign.detection_type;
+            } else {
+                // Extract speed limit value
+                const parts = sign.detection_type.toLowerCase().split("speed_limit_");
+                maxspeedValue = parts.length > 1 ? parts[1] : sign.detection_type;
+            }
+        }
+    } else {
+        // Oneways mode: keep original detection_type
+        maxspeedValue = sign.detection_type || '';
+    }
+
+    // Parse coordinates
+    let lat = 0, lon = 0;
+    if (sign.coordinates && Array.isArray(sign.coordinates) && sign.coordinates.length >= 2) {
+        lon = sign.coordinates[0];
+        lat = sign.coordinates[1];
+    } else if (sign.lat && sign.lon) {
+        lat = parseFloat(sign.lat);
+        lon = parseFloat(sign.lon);
+    }
+
+    // Parse angle for URLs
+    const angle = parseFloat(sign.angle) || 0;
+
+    // Generate all URLs
+    const properties = {
+        id: sign.id || '',
+        supplementary_type: sign.supplementary_type || '',
+        angle: angle.toString(),
+        confidence: sign.confidence || '',
+        cluster_size: sign.cluster_size || '',
+        url_rsd_link: getLvdExplorerLink(lon, lat, 18),
+        url_google: withGoogleLink(lon, lat, angle),
+        url_bing: getBingLink(lon, lat, angle),
+        url_mapillary: getMapillaryLink(lon, lat, angle),
+        url_tabula_rasa_link: getTabulaLink(lat, lon)
+    };
+
+    // Add maxspeed or detection_type based on mode
+    if (currentProcessingMode === 'speed_limits') {
+        properties.maxspeed = maxspeedValue;
+    } else {
+        properties.detection_type = sign.detection_type || '';
+        // Also include maxspeed if it exists in original data
+        if (sign.maxspeed) {
+            properties.maxspeed = sign.maxspeed;
+        }
+    }
+
+    // Add optional timestamp fields if they exist
+    if (sign.creation_timestamp) properties.creation_timestamp = sign.creation_timestamp;
+    if (sign.last_modified_timestamp) properties.last_modified_timestamp = sign.last_modified_timestamp;
+
+    return {
+        type: 'Feature',
+        properties: properties,
+        geometry: {
+            type: 'Point',
+            coordinates: [lon, lat]
+        }
+    };
+}
+
+        function processMaxspeed(detectionType) {
+            if (!detectionType) return '';
+
+            if (!detectionType.toLowerCase().startsWith("speed_limit")) {
+                return detectionType;
+            }
+
+            // Extract speed limit value
+            const parts = detectionType.toLowerCase().split("speed_limit_");
+            if (parts.length > 1) {
+                return parts[1]; // Returns just the speed value, e.g., "50"
+            }
+            return detectionType;
+        }
+
+        // Download combined GeoJSON
+        document.getElementById('downloadCombinedResultsBtn').addEventListener('click', async function() {
+            if (!combinedGeoJSON || Object.keys(combinedGeoJSON).length === 0) {
+                showStatus('No combined data available', 'error');
+                return;
+            }
+
+            try {
+                await loadJSZip();
+                const zip = new JSZip();
+                let fileCount = 0;
+                let csvContent = "QuadKey,Road Length (m),Sign Count,Total Features\n";
+                for (const [country, quadkeys] of Object.entries(combinedGeoJSON)) {
+                    const countryFolder = zip.folder(country);
+
+                    for (const [quadkey, geojson] of Object.entries(quadkeys)) {
+                        if (geojson.features.length > 0) {
+                            // Separate roads and signs
+                            const roadsFeatures = geojson.features.filter(f => f.geometry.type !== 'LineString');
+                            const signsFeatures = geojson.features.filter(f => f.geometry.type === 'Point');
+
+                            // Generate CSV
+
+                            csvContent += `${quadkey},${stats.roadLength.toFixed(2)},${signsFeatures}\n`;
+
+
+                            // Create combined file
+                            const fileName = `${quadkey}.geojson`;
+                            countryFolder.file(fileName, JSON.stringify(geojson, null, 2));
+                            fileCount++;
+                        }
+                    }
+                }
+
+                navigator.clipboard.writeText(f`${csvContent}`).then(() => {
+                    showStatus('Stats copied to clipboard!', 'success');
+                });
+
+<!--                // Add download functionality-->
+<!--                document.getElementById('downloadStats').addEventListener('click', () => {-->
+<!--                    downloadCSV(csvContent, 'quadkey_statistics.csv');-->
+<!--                });-->
+
+<!--                // Display results-->
+<!--                const statsResults = document.getElementById('statsResults');-->
+<!--                statsResults.innerHTML = `-->
+<!--                    <div class="card">-->
+<!--                        <div class="card-header">-->
+<!--                            <h5 class="mb-0">QuadKey Statistics (Sorted by Road Length)</h5>-->
+<!--                        </div>-->
+<!--                        <div class="card-body">-->
+<!--                            <pre class="bg-light p-3">${csvContent}</pre>-->
+<!--                            <button id="downloadStats" class="btn btn-success">-->
+<!--                                <i class="fas fa-download"></i> Download CSV-->
+<!--                            </button>-->
+<!--                        </div>-->
+<!--                    </div>-->
+<!--                `;-->
+
+                // Generate and download zip file
+                zip.generateAsync({ type: 'blob' }).then(function(content) {
+                    const url = URL.createObjectURL(content);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    let currentDate = new Date();
+                    let iso = currentDate.toISOString()
+                    a.download = `roads_signs_${currentProcessingMode}_${iso}.zip`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+
+                    // Count totals
+                    let totalRoads = 0;
+                    let totalSigns = 0;
+
+                    for (const [country, quadkeys] of Object.entries(combinedGeoJSON)) {
+                        for (const [quadkey, geojson] of Object.entries(quadkeys)) {
+                            totalRoads += geojson.features.filter(f => f.properties.type !== 'sign').length;
+                            totalSigns += geojson.features.filter(f => f.properties.type === 'sign').length;
+                        }
+                    }
+
+                    showStatus(`Downloaded ${fileCount} GeoJSON files with ${totalRoads} roads and ${totalSigns} signs`, 'success');
+                });
+
+            } catch (error) {
+                showStatus('Error creating zip file: ' + error.message, 'error');
+                console.error(error);
+            }
+        });
+
+        // Geographic utility functions for URL generation
+        function normalizeDeg360(deg) {
+            let normalized = deg;
+            while (normalized >= 360) {
+                normalized -= 360;
+            }
+            while (normalized < 0) {
+                normalized += 360;
+            }
+            return normalized;
+        }
+
+        function getOppositeAngle(deg) {
+            return normalizeDeg360(deg + 180.0);
+        }
+
+                // Calculate destination point given start point, bearing, and distance
+        function calculateDestination(lat, lon, bearing, distanceMeters) {
+            // Simple spherical Earth calculation (good enough for short distances)
+            const R = 6371000; // Earth's radius in meters
+            const bearingRad = bearing * Math.PI / 180;
+            const latRad = lat * Math.PI / 180;
+            const lonRad = lon * Math.PI / 180;
+
+            const angularDistance = distanceMeters / R;
+
+            const lat2Rad = Math.asin(
+                Math.sin(latRad) * Math.cos(angularDistance) +
+                Math.cos(latRad) * Math.sin(angularDistance) * Math.cos(bearingRad)
+            );
+
+            const lon2Rad = lonRad + Math.atan2(
+                Math.sin(bearingRad) * Math.sin(angularDistance) * Math.cos(latRad),
+                Math.cos(angularDistance) - Math.sin(latRad) * Math.sin(lat2Rad)
+            );
+
+            return {
+                lat: lat2Rad * 180 / Math.PI,
+                lon: lon2Rad * 180 / Math.PI
+            };
+        }
+
+        // URL generation functions
+        function withGoogleLink(lon, lat, hdg, distance = 10) {
+            const hdgNum = parseFloat(hdg) || 0;
+            const oppositeAngle = getOppositeAngle(hdgNum);
+            const dest = calculateDestination(lat, lon, oppositeAngle, distance);
+            return `https://maps.google.com/maps?q=&layer=c&cbll=${dest.lat},${dest.lon}&cbp=11,${hdgNum},0,0,0`;
+        }
+
+        function getTabulaLink(lat, lon) {
+            const disable_features = "points,service_roads,paths,buildings,building_parts,indoor,landuse,boundaries,water,rail,pistes,aerialways,power,past_future,others";
+            return `https://tabula-rasa-roads-production.tilestream.net/id-internal/index.html#disable_features=${disable_features}&map=20.90/${lat}/${lon}`;
+        }
+
+        function getMapillaryLink(lon, lat, hdg, zoom = 17) {
+            const hdgNum = parseFloat(hdg) || 0;
+            const oppositeAngle = getOppositeAngle(hdgNum);
+            const dest = calculateDestination(lat, lon, oppositeAngle, 10);
+            return `https://www.mapillary.com/app/?lat=${dest.lat}&lng=${dest.lon}&z=${zoom}`;
+        }
+
+        function getBingLink(lon, lat, hdg) {
+            const hdgNum = parseFloat(hdg) || 0;
+            const oppositeAngle = getOppositeAngle(hdgNum);
+            const dest = calculateDestination(lat, lon, oppositeAngle, 10);
+            return `https://www.bing.com/maps?cp=${dest.lat}~${dest.lon}&lvl=15&dir=${hdgNum}&style=x&v=2&sV=1`;
+        }
+
+        function getLvdExplorerLink(lon, lat, zoom = 18) {
+            return `https://sites.mapbox.com/lvd-explorer/#${zoom}/${lat}/${lon}`;
+        }
+
+        function isQuadkeyInResults(quadkey) {
+            if (!currentCountryQuadkeys) return false;
+
+            for (const quadkeys of Object.values(currentCountryQuadkeys)) {
+                if (quadkeys.includes(quadkey)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+                function generateHereRoadsSQL(countryQuadkeys) {
+            const sortedCountries = Object.keys(countryQuadkeys).sort();
+            const countryConditions = [];
+            let escapedWKT;
+            for (const country of sortedCountries) {
+                const quadkeys = countryQuadkeys[country];
+                if (quadkeys.length === 0) continue;
+                const wktMultipolygon = generateMultipolygonWKT(quadkeys);
+                escapedWKT = wktMultipolygon.replace(/'/g, "''");
+            }
+
+            const query = `WITH ways AS (
+          SELECT
+            id,
+            osmium_id,
+            mapbox_id,
+            type,
+            tags,
+            nds,
+            dt
+          FROM
+            roads_hereproduction.road_pipeline_v3_0_0_road_here
+          WHERE
+            dt = '2026-01-15'
+            AND region = 'Europe_West'
+            AND type = 'way'
+            and tags['highway'] in ('motorway', 'trunk', 'motorway_link', 'trunk_link', 'primary', 'primary_link', 'secondary', 'secondary_link', 'tertiary', 'unclassified', 'residential', 'tertiary_link')
+        ),
+        nodes AS (
+          SELECT
+            id,
+            lat,
+            lon
+          FROM
+            roads_hereproduction.road_pipeline_v3_0_0_road_here
+          WHERE
+            dt = '2026-01-15'
+            AND region = 'Europe_West'
+            AND type = 'node'
+            AND lat IS NOT NULL
+            AND lon IS NOT NULL
+        ),
+        unique_way_points AS (
+          SELECT
+            *
+          FROM (
+            SELECT
+              w.id,
+              w.osmium_id,
+              w.mapbox_id,
+              w.type,
+              w.tags,
+              w.dt,
+              t.node_index,
+              ST_Point(n.lon, n.lat) AS point_geom,
+              LAG(ST_Point(n.lon, n.lat), 1) OVER (PARTITION BY w.id ORDER BY t.node_index) AS prev_point_geom
+            FROM
+              ways AS w
+            CROSS JOIN
+              UNNEST(w.nds) WITH ORDINALITY AS t(node_id, node_index)
+            JOIN
+              nodes AS n ON t.node_id = n.id
+          )
+          WHERE
+            prev_point_geom IS NULL OR NOT ST_Equals(point_geom, prev_point_geom)
+        ),
+        geom AS (
+            SELECT
+              uwp.id,
+              uwp.osmium_id,
+              uwp.mapbox_id,
+              uwp.type,
+              uwp.tags,
+              uwp.dt,
+              array_agg(uwp.point_geom ORDER BY uwp.node_index) as geometry_arr,
+              ST_LineString(array_agg(uwp.point_geom ORDER BY uwp.node_index)) AS geometry
+            FROM
+              unique_way_points AS uwp
+            GROUP BY
+              uwp.id,
+              uwp.osmium_id,
+              uwp.mapbox_id,
+              uwp.type,
+              uwp.tags,
+              uwp.dt
+            HAVING
+              count(uwp.point_geom) >= 2
+        )
+        SELECT
+              id,
+              tags,
+              ST_AsText(geometry) as geometry_wkt
+        FROM geom
+        WHERE
+            ST_Intersects(
+                geometry,
+                st_geometryfromtext('${escapedWKT}')
+            )`;
+            return query;
         }
 
         // Copy WKT to clipboard
@@ -2488,11 +3068,304 @@ out skel qt;`;
             return { lat: 0, lng: 0 };
         }
 
+        function initQuadkeySearch() {
+    const searchInput = document.getElementById('searchQuadkey');
+    const searchBtn = document.getElementById('searchQuadkeyBtn');
+    const searchResult = document.getElementById('searchResult');
+    const searchActions = document.getElementById('searchActions');
+    const addSearchedBtn = document.getElementById('addSearchedQuadkeysBtn');
+    const removeSearchedBtn = document.getElementById('removeSearchedQuadkeysBtn');
+
+    let searchedQuadkeys = [];
+    let searchedQuadkeysData = new Map();
+    let currentHighlights = [];
+    let currentSearchMarker = null;
+
+    // Search and zoom to quadkeys
+    searchBtn.addEventListener('click', async function() {
+        const input = searchInput.value.trim();
+        if (!input) {
+            searchResult.textContent = 'Please enter quadkeys';
+            searchResult.style.color = '#e74c3c';
+            searchActions.style.display = 'none';
+            return;
+        }
+
+        // Parse comma-separated quadkeys
+        const quadkeyStrings = input.split(',').map(q => q.trim()).filter(q => q.length > 0);
+
+        // Validate quadkey formats
+        const invalidQuadkeys = quadkeyStrings.filter(q => !/^\d+$/.test(q));
+        if (invalidQuadkeys.length > 0) {
+            searchResult.textContent = `Invalid quadkey format: ${invalidQuadkeys.join(', ')}. Quadkeys should contain only digits.`;
+            searchResult.style.color = '#e74c3c';
+            searchActions.style.display = 'none';
+            return;
+        }
+
+        try {
+            // Clear previous highlights
+            clearSearchHighlight();
+            searchedQuadkeys = [];
+            searchedQuadkeysData.clear();
+
+            let combinedBounds = null;
+            const results = [];
+
+            // Process each quadkey
+            for (let i = 0; i < quadkeyStrings.length; i++) {
+                const quadkey = quadkeyStrings[i];
+
+                // Get bounds for the quadkey
+                const bounds = quadkeyToBounds(quadkey);
+
+                // Store quadkey data
+                searchedQuadkeys.push(quadkey);
+                searchedQuadkeysData.set(quadkey, { bounds, index: i });
+
+                // Highlight this quadkey on the map
+                highlightQuadkeyOnMap(quadkey, bounds, i);
+
+                // Get countries for this quadkey
+                const countries = await getQuadkeyCountries(quadkey);
+
+                // Create bounding box for Mapbox
+                const quadkeyBounds = [
+                    [bounds.west, bounds.south],
+                    [bounds.east, bounds.north]
+                ];
+
+                // Update combined bounds
+                if (!combinedBounds) {
+                    combinedBounds = quadkeyBounds;
+                } else {
+                    // Extend bounds
+                    combinedBounds[0][0] = Math.min(combinedBounds[0][0], quadkeyBounds[0][0]);
+                    combinedBounds[0][1] = Math.min(combinedBounds[0][1], quadkeyBounds[0][1]);
+                    combinedBounds[1][0] = Math.max(combinedBounds[1][0], quadkeyBounds[1][0]);
+                    combinedBounds[1][1] = Math.max(combinedBounds[1][1], quadkeyBounds[1][1]);
+                }
+
+                // Add to results display
+            }
+
+            // Zoom to show all quadkeys
+            if (combinedBounds) {
+                map.fitBounds(combinedBounds, {
+                    padding: 50,
+                    maxZoom: 18
+                });
+            }
+
+            // Show search results
+            searchResult.innerHTML = `
+                <div style="margin-bottom: 10px;">
+                    <strong>Found ${quadkeyStrings.length} quadkey(s):</strong>
+                </div>
+                ${results.join('')}
+            `;
+            searchResult.style.color = '#333';
+
+            // Show action buttons
+            searchActions.style.display = 'block';
+
+            // Update button states
+            updateSearchActionButtons();
+
+        } catch (error) {
+            searchResult.textContent = `Error: ${error.message}`;
+            searchResult.style.color = '#e74c3c';
+            searchActions.style.display = 'none';
+            console.error('Quadkey search error:', error);
+        }
+    });
+
+    // Add all searched quadkeys to results
+    addSearchedBtn.addEventListener('click', async function() {
+        if (searchedQuadkeys.length === 0) {
+            showStatus('No quadkeys to add', 'error');
+            return;
+        }
+
+        try {
+            setLoading(true);
+            let addedCount = 0;
+
+            for (const quadkey of searchedQuadkeys) {
+                if (!isQuadkeyInResults(quadkey)) {
+                    const data = searchedQuadkeysData.get(quadkey);
+                    if (data) {
+                        const countries = await getQuadkeyCountries(quadkey);
+                        if (countries.length > 0) {
+                            addQuadkey(quadkey, countries);
+                            addedCount++;
+                        }
+                    }
+                }
+            }
+
+            if (addedCount > 0) {
+                updateDisplayAndVisualization();
+                recalculateStatistics();
+                if (currentCountryQuadkeys) {
+                    createCountryControls(currentCountryQuadkeys, true);
+                }
+                showStatus(`Added ${addedCount} quadkey(s) to results`, 'success');
+                updateSearchResultStatus();
+            } else {
+                showStatus('All quadkeys are already in results', 'info');
+            }
+
+        } catch (error) {
+            showStatus(`Error adding quadkeys: ${error.message}`, 'error');
+        } finally {
+            setLoading(false);
+        }
+    });
+
+    // Remove all searched quadkeys from results
+    removeSearchedBtn.addEventListener('click', function() {
+        if (searchedQuadkeys.length === 0) {
+            showStatus('No quadkeys to remove', 'error');
+            return;
+        }
+
+        let removedCount = 0;
+
+        for (const quadkey of searchedQuadkeys) {
+            if (isQuadkeyInResults(quadkey)) {
+                const data = searchedQuadkeysData.get(quadkey);
+                if (data) {
+                    const countries = Array.from(quadkeyCountriesMap.get(quadkey) || []);
+                    if (countries.length > 0) {
+                        removeQuadkey(quadkey, countries);
+                        removedCount++;
+                    }
+                }
+            }
+        }
+
+        if (removedCount > 0) {
+            updateDisplayAndVisualization();
+            recalculateStatistics();
+            if (currentCountryQuadkeys) {
+                createCountryControls(currentCountryQuadkeys, true);
+            }
+            showStatus(`Removed ${removedCount} quadkey(s) from results`, 'success');
+            updateSearchResultStatus();
+        } else {
+            showStatus('None of the searched quadkeys are in results', 'info');
+        }
+    });
+
+    // Allow Enter key to search
+    searchInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            searchBtn.click();
+        }
+    });
+
+    function clearSearchHighlight() {
+        // Remove polygon highlights
+        currentHighlights.forEach(sourceId => {
+            if (map.getSource(sourceId)) {
+                map.removeLayer(sourceId + '-fill');
+                map.removeLayer(sourceId + '-line');
+                map.removeSource(sourceId);
+            }
+        });
+        currentHighlights = [];
+    }
+
+    function highlightQuadkeyOnMap(quadkey, bounds, index) {
+        const sourceId = `search-highlight-${quadkey}`;
+        const colors = ['#FF0000', '#00FF00', '#0000FF', '#FFFF00', '#FF00FF', '#00FFFF'];
+        const color = colors[index % colors.length];
+
+        // Create GeoJSON polygon for the quadkey bounds
+        const polygon = {
+            type: 'Feature',
+            geometry: {
+                type: 'Polygon',
+                coordinates: [[
+                    [bounds.west, bounds.south],
+                    [bounds.east, bounds.south],
+                    [bounds.east, bounds.north],
+                    [bounds.west, bounds.north],
+                    [bounds.west, bounds.south]
+                ]]
+            },
+            properties: {
+                quadkey: quadkey,
+                index: index
+            }
+        };
+
+        // Add source and layers to map
+        if (!map.getSource(sourceId)) {
+            map.addSource(sourceId, {
+                type: 'geojson',
+                data: polygon
+            });
+
+            // Add fill layer
+            map.addLayer({
+                id: sourceId + '-fill',
+                type: 'fill',
+                source: sourceId,
+                paint: {
+                    'fill-color': color,
+                    'fill-opacity': 0.3
+                }
+            });
+
+            // Add border layer
+            map.addLayer({
+                id: sourceId + '-line',
+                type: 'line',
+                source: sourceId,
+                paint: {
+                    'line-color': color,
+                    'line-width': 2,
+                    'line-opacity': 0.8
+                }
+            });
+
+            currentHighlights.push(sourceId);
+        }
+    }
+
+    // Clear search result when input changes
+    searchInput.addEventListener('input', function() {
+        searchResult.textContent = '';
+        searchActions.style.display = 'none';
+        clearSearchHighlight();
+        searchedQuadkeys = [];
+        searchedQuadkeysData.clear();
+    });
+
+    // Helper function to update button states
+    function updateSearchActionButtons() {
+        // Enable/disable buttons based on whether quadkeys are already in results
+        const hasQuadkeysNotInResults = searchedQuadkeys.some(q => !isQuadkeyInResults(q));
+        const hasQuadkeysInResults = searchedQuadkeys.some(q => isQuadkeyInResults(q));
+
+        addSearchedBtn.disabled = !hasQuadkeysNotInResults;
+        removeSearchedBtn.disabled = hasQuadkeysInResults;
+    }
+
+    // Helper function to update search result status
+    function updateSearchResultStatus() {
+        // Update the "Already in results" status in the search results display
+        updateSearchActionButtons();
+    }
+}
+
         // Initialize the application
         document.addEventListener('DOMContentLoaded', function() {
             initMap();
             initProcessingMode();
-
+            initQuadkeySearch();
             // Add quadkey mode button
             document.getElementById('addQuadkeyModeBtn').addEventListener('click', function() {
                 addQuadkeyMode = !addQuadkeyMode;
@@ -2545,6 +3418,32 @@ out skel qt;`;
                 if (intersect) inside = !inside;
             }
             return inside;
+        }
+
+        function calculateLineLength(coords) {
+            let totalLength = 0;
+
+            for (let i = 0; i < coords.length - 1; i++) {
+                const [lon1, lat1] = coords[i];
+                const [lon2, lat2] = coords[i + 1];
+
+                // Haversine formula
+                const R = 6371000; // Earth's radius in meters
+                const φ1 = lat1 * Math.PI / 180;
+                const φ2 = lat2 * Math.PI / 180;
+                const Δφ = (lat2 - lat1) * Math.PI / 180;
+                const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+                const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+                         Math.cos(φ1) * Math.cos(φ2) *
+                         Math.sin(Δλ/2) * Math.sin(Δλ/2);
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                const distance = R * c;
+
+                totalLength += distance;
+            }
+
+            return totalLength;
         }
 
         function connectSegments(segments) {
@@ -2610,15 +3509,6 @@ out skel qt;`;
             return rings;
         }
 
-        function updateStats() {
-<!--            statsQuadkeys.textContent = generatedQuadkeys.length + routeQuadkeys.length;-->
-<!--            statsSelected.textContent = selectedAdminPolygon ? selectedAdminPolygon.properties.name : 'None';-->
-        }
-
-<!--        function filterQuadkeysInSelectedPolygons(polygon, qk){-->
-<!--            bboxIntersectsPolygon(polygon, qk);-->
-<!--        }-->
-
 
         function coordinatesToWktPolygon(coords) {
             // WKT requires longitude first, then latitude
@@ -2633,7 +3523,6 @@ out skel qt;`;
 
             // 2. Iterate and remove if name matches
             allLayers.forEach(layer => {
-              console.log(layer.id);
 <!--              if (layer.id === layerNameToRemove) {-->
 <!--                map.removeLayer(layer.id);-->
 <!--                console.log(`Removed layer: ${layer.id}`);-->
@@ -3079,21 +3968,10 @@ out skel qt;`;
             } else if (currentProcessingMode === 'oneways'){
                 endFields = `tags['highway'] in ('unclassified', 'residential', 'living_street')`;
             }
-            let polygonCondition = '';
-            if (selectedAdminPolygon){
-                console.log(selectedAdminPolygon);
-                for (let poly = 0; poly < selectedAdminPolygon.length; poly++){
-                    let base = `and st_intersects(
-                        st_geometryfromtext(geometry_wkt),
-                        st_geometryfromtext('${coordinatesToWktPolygon(selectedAdminPolygon[poly].geometry.coordinates)}'))\n\t\t`;
-                    polygonCondition += base;
-                }
-            }
             return `${selectFields}
                 from roads_production.road_pipeline_corrections_v1_1_0_metadata_corrected_osm_roads_enriched
                 where dt = ${strFormattedDate}
                 and ${finalCountryCondition}
-                ${polygonCondition}
                 and ${endFields}`;
         }
 
@@ -3129,6 +4007,966 @@ out skel qt;`;
                 console.error(error);
             }
         });
+
+        // Parse CSV file
+        document.getElementById('csvFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const csvContent = e.target.result;
+                    csvRoadsData = parseCSV(csvContent);
+
+                    if (csvRoadsData.length === 0) {
+                        showStatus('No valid roads found in CSV file', 'error');
+                        return;
+                    }
+
+                    document.getElementById('csvInputLabel').textContent = file.name;
+                    document.getElementById('processCSVBtn').disabled = false;
+                    showStatus(`Loaded ${csvRoadsData.length} roads from CSV`, 'success');
+
+                } catch (error) {
+                    showStatus(`Error parsing CSV: ${error.message}`, 'error');
+                    console.error(error);
+                }
+            };
+
+            reader.readAsText(file);
+        });
+
+        // Parse CSV content
+        function parseCSV(csvContent) {
+            const roads = [];
+            const lines = csvContent.split('\n').filter(line => line.trim() !== '');
+
+            if (lines.length < 2) {
+                throw new Error('CSV file must have at least a header and one data row');
+            }
+
+            const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+
+            // Parse data rows
+            for (let i = 1; i < lines.length; i++) {
+                const line = lines[i];
+                const values = parseCSVLine(line);
+
+                if (values.length < headers.length) {
+                    console.warn(`Skipping line ${i}: insufficient columns`);
+                    continue;
+                }
+
+                const road = {
+                    id: values[headers.indexOf('\"id\"')] || '',
+                    tags: values[headers.indexOf('\"tags\"')] || '{}',
+                    geometry: values[headers.indexOf('\"geometry_wkt\"')] || '',
+                    // Try to find country in any column
+                    country: ''
+                };
+
+                // Look for country in metadata_str['iso:3166_1'] column or similar
+                for (let j = 0; j < headers.length; j++) {
+                    if (headers[j].includes('iso:3166_1') || headers[j].includes('country')) {
+                        road.country = values[j] || '';
+                        break;
+                    }
+                }
+
+                // Parse tags JSON and convert to key-value pairs
+                parseTags(road);
+
+                // Parse WKT geometry
+                const coords = parseWKTGeometry(road.geometry);
+                if (coords && coords.length >= 2) {
+                    road.coordinates = coords;
+                    roads.push(road);
+                } else {
+                    console.warn(`Skipping road ${road.id} - invalid geometry`);
+                }
+            }
+
+            return roads;
+        }
+
+        // Parse tags JSON string to key-value object
+        function parseTags(road) {
+            let tagsString = road.tags;
+            if (!tagsString || tagsString.trim() === '') {
+                return;
+            }
+
+            try {
+                // Clean the tags string
+                let cleanTags = tagsString.trim();
+                if (cleanTags.startsWith('"') && cleanTags.endsWith('"')) {
+                    cleanTags = cleanTags.slice(1, -1);
+                }
+                if (cleanTags.startsWith("'") && cleanTags.endsWith("'")) {
+                    cleanTags = cleanTags.slice(1, -1);
+                }
+
+                // Replace single quotes with double quotes for JSON parsing
+                cleanTags = cleanTags.replace(/'/g, '"');
+                cleanTags = cleanTags.replace('{', '');
+                cleanTags = cleanTags.replace('}', '');
+
+                // Parse tags
+                const tags = cleanTags.split(", ");
+                for (let pair of tags) {
+                    if (pair.includes('=')) {
+                        const p = pair.indexOf('=');
+                        let key = pair.substring(0, p)
+                        let value = pair.substring(p+1)
+                        if (key === 'geometry' || key === 'id' || key === 'tags') {
+                            continue;
+                        }
+                        road[key] = value;
+                    }
+                }
+            } catch (error) {
+                console.warn('Error parsing tags:', error);
+            }
+        }
+
+        // Extract key-value pairs from a string
+        function extractKeyValuePairs(str) {
+            const result = {};
+            const pairs = str.match(/(\w+)\s*:\s*("[^"]*"|[^,}\s]+)/g);
+
+            if (pairs) {
+                pairs.forEach(pair => {
+                    const [key, value] = pair.split(':').map(s => s.trim());
+                    const cleanValue = value.replace(/^["']|["']$/g, '');
+                    result[key] = cleanValue;
+                });
+            }
+
+            return result;
+        }
+
+        // Simple CSV line parser
+        function parseCSVLine(line) {
+            const values = [];
+            let currentValue = '';
+            let insideQuotes = false;
+
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                const nextChar = line[i + 1];
+
+                if (char === '"' && !insideQuotes) {
+                    insideQuotes = true;
+                } else if (char === '"' && insideQuotes) {
+                    if (nextChar === '"') {
+                        currentValue += '"';
+                        i++; // Skip next quote
+                    } else {
+                        insideQuotes = false;
+                    }
+                } else if (char === ',' && !insideQuotes) {
+                    values.push(currentValue);
+                    currentValue = '';
+                } else {
+                    currentValue += char;
+                }
+            }
+
+            values.push(currentValue);
+            return values;
+        }
+
+        // Parse WKT geometry string
+        function parseWKTGeometry(wkt) {
+            if (!wkt) return null;
+
+            // Handle LINESTRING WKT format
+            if (wkt.toUpperCase().startsWith('LINESTRING')) {
+                // Remove LINESTRING( and )
+                const coordsStr = wkt.replace(/LINESTRING\s*\(/i, '').replace(/\)$/, '');
+                const coordPairs = coordsStr.split(',');
+                return coordPairs.map(pair => {
+                    const coords = pair.trim().split(/\s+/);
+                    if (coords.length >= 2) {
+                        return [parseFloat(coords[0]), parseFloat(coords[1])]; // [lng, lat]
+                    }
+                    return null;
+                }).filter(coord => coord !== null);
+            }
+
+            return null;
+        }
+
+        document.getElementById('processCSVBtn').addEventListener('click', async function() {
+    if (!currentCountryQuadkeys || Object.keys(currentCountryQuadkeys).length === 0) {
+        showStatus('Please calculate quadkeys from a route first', 'error');
+        return;
+    }
+
+    if (csvRoadsData.length === 0) {
+        showStatus('Please upload a CSV file first', 'error');
+        return;
+    }
+
+    setLoading(true);
+    showStatus(`Processing CSV roads in ${currentProcessingMode === 'speed_limits' ? 'Speed Limits' : 'Oneways'} mode...`, 'info');
+
+    try {
+        processedRoadsGeoJSON = await processRoadsCSV(csvRoadsData, currentZoomLevel);
+        document.getElementById('downloadCSVResultsBtn').disabled = false;
+
+        const modeName = currentProcessingMode === 'speed_limits' ? 'Speed Limits' : 'Oneways';
+        showStatus(`Processed ${csvRoadsData.length} roads in ${modeName} mode`, 'success');
+
+    } catch (error) {
+        showStatus(`Error processing CSV: ${error.message}`, 'error');
+        console.error(error);
+    } finally {
+        setLoading(false);
+    }
+});
+
+    let quadKeyStats = {}
+
+        // Process CSV roads and create GeoJSON organized by country/quadkey (roads NOT shared)
+async function processRoadsCSV(roads, zoomLevel) {
+    quadKeyStats = {}
+    // Create a map of quadkey to countries for faster lookup
+    const quadkeyToCountries = new Map();
+    for (const [quadkey, countries] of quadkeyCountriesMap.entries()) {
+        quadkeyToCountries.set(quadkey, Array.from(countries));
+    }
+
+    // Get all quadkey bounds for intersection calculations
+    const quadkeyBounds = new Map();
+    for (const quadkey of quadkeyToCountries.keys()) {
+        quadkeyBounds.set(quadkey, quadkeyToBounds(quadkey));
+    }
+
+    // Create GeoJSON structure organized by country and quadkey
+    const geoJSONByCountryQuadkey = {};
+
+    let assignedCount = 0;
+    let totalRoads = roads.length;
+    let processedCount = 0;
+
+    for (let roadIndex = 0; roadIndex < roads.length; roadIndex++) {
+        const road = roads[roadIndex];
+        if (!road.coordinates || road.coordinates.length < 2) continue;
+
+        // Get the road's country from metadata
+        const roadCountry = road.country || 'UNKNOWN';
+
+        // Find all quadkeys this road intersects with
+        const intersectingQuadkeys = new Map(); // quadkey -> intersection length
+
+        for (const [quadkey, bounds] of quadkeyBounds.entries()) {
+            // Check if road intersects with this quadkey
+            if (lineStringIntersectsBounds(road.coordinates, bounds)) {
+                // Calculate intersection length
+                const intersectionLength = calculateIntersectionLength(road.coordinates, bounds);
+                if (intersectionLength > 0) {
+                    intersectingQuadkeys.set(quadkey, intersectionLength);
+                }
+            }
+        }
+
+        // If road intersects with any quadkey, assign it to the one with largest intersection
+        if (intersectingQuadkeys.size > 0) {
+            // Find quadkey with maximum intersection length
+            let bestQuadkey = null;
+            let maxLength = 0;
+
+            for (const [quadkey, length] of intersectingQuadkeys.entries()) {
+                if (length > maxLength) {
+                    maxLength = length;
+                    bestQuadkey = quadkey;
+                }
+            }
+
+            if (bestQuadkey) {
+                assignedCount++;
+
+                // Filter tags with default maxspeed values
+                const filteredRoad = filterRoadTags(road);
+
+                // Initialize country structure if not exists
+                if (!geoJSONByCountryQuadkey[roadCountry]) {
+                    geoJSONByCountryQuadkey[roadCountry] = {};
+                }
+
+                // Initialize quadkey structure if not exists
+                if (!geoJSONByCountryQuadkey[roadCountry][bestQuadkey]) {
+                    geoJSONByCountryQuadkey[roadCountry][bestQuadkey] = {
+                        type: 'FeatureCollection',
+                        features: []
+                    };
+                }
+
+                // Create road feature
+                const feature = {
+                    type: 'Feature',
+                    properties: filteredRoad,
+                    geometry: {
+                        type: 'LineString',
+                        coordinates: road.coordinates
+                    }
+                };
+                geoJSONByCountryQuadkey[roadCountry][bestQuadkey].features.push(feature);
+            }
+        }
+
+        processedCount++;
+        // Update progress percentage
+        const percentage = Math.round((processedCount / totalRoads) * 100);
+        if (roadIndex % 100 === 0) {
+            showStatus(`Processing roads: ${percentage}% complete`, 'info');
+        }
+
+        // Allow UI to update
+        if (roadIndex % 10 === 0) {
+            await new Promise(resolve => setTimeout(resolve, 0));
+        }
+    }
+
+    showStatus(`Processing complete: 100%`, 'success');
+    showStatus(`Assigned ${assignedCount} roads to quadkeys (${roads.length - assignedCount} not assigned)`, 'success');
+
+    return geoJSONByCountryQuadkey;
+}
+
+        document.getElementById('copySignsSqlBtn').addEventListener('click', function() {
+            if (!currentFilteredCountryQuadkeys && (!currentCountryQuadkeys || Object.keys(currentCountryQuadkeys).length === 0)) {
+                showStatus('No quadkey data available. Please add quadkeys first.', 'error');
+                return;
+            }
+
+            try {
+                const signsSQL = generateSignsSQL(currentFilteredCountryQuadkeys || currentCountryQuadkeys || {});
+
+                navigator.clipboard.writeText(signsSQL).then(() => {
+                    showStatus('Signs SQL copied to clipboard!', 'success');
+                }).catch(err => {
+                    console.error('Copy failed:', err);
+                    // Fallback for older browsers
+                    const textArea = document.createElement('textarea');
+                    textArea.value = signsSQL;
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                    showStatus('Signs SQL copied to clipboard!', 'success');
+                });
+            } catch (error) {
+                showStatus(`Error generating signs SQL: ${error.message}`, 'error');
+                console.error(error);
+            }
+        });
+
+        // Global variables for signs data
+        let signsCsvData = [];
+        let combinedGeoJSON = null;
+
+        // Parse Signs CSV
+        document.getElementById('signsCsvFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const csvContent = e.target.result;
+                    signsCsvData = parseSignsCSV(csvContent);
+
+                    if (signsCsvData.length === 0) {
+                        showStatus('No valid signs found in CSV file', 'error');
+                        return;
+                    }
+
+                    document.getElementById('signsCsvInputLabel').textContent = file.name;
+                    document.getElementById('processSignsCSVBtn').disabled = false;
+                    showStatus(`Loaded ${signsCsvData.length} signs from CSV`, 'success');
+
+                } catch (error) {
+                    showStatus(`Error parsing Signs CSV: ${error.message}`, 'error');
+                    console.error(error);
+                }
+            };
+
+            reader.readAsText(file);
+        });
+
+        // Parse Signs CSV content
+        function parseSignsCSV(csvContent) {
+            const signs = [];
+            const lines = csvContent.split('\n').filter(line => line.trim() !== '');
+
+            if (lines.length < 2) {
+                throw new Error('Signs CSV file must have at least a header and one data row');
+            }
+
+            const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/"/g, ''));
+
+            // Parse data rows
+            for (let i = 1; i < lines.length; i++) {
+                const line = lines[i];
+                const values = parseCSVLine(line);
+
+                if (values.length < headers.length) {
+                    console.warn(`Skipping line ${i}: insufficient columns`);
+                    continue;
+                }
+
+                const sign = {};
+
+                // Map values to headers
+                headers.forEach((header, index) => {
+                    let value = values[index] || '';
+                    // Remove surrounding quotes
+                    if (typeof value === 'string') {
+                        value = value.replace(/^["']|["']$/g, '').trim();
+                    }
+                    sign[header] = value;
+                });
+
+                // Try to get coordinates from different sources
+                let lat = null, lon = null;
+
+                // 1. Try from explicit lat/lon columns
+                if (sign.lat && sign.lon) {
+                    lat = parseFloat(sign.lat);
+                    lon = parseFloat(sign.lon);
+                }
+
+                // 2. Try from geometry_wkt
+                if ((!lat || !lon) && sign.geometry_wkt) {
+                    const coords = parseWKTGeometry(sign.geometry_wkt);
+                    if (coords && coords.length > 0) {
+                        if (sign.geometry_wkt.toUpperCase().includes('POINT')) {
+                            lon = coords[0][0];
+                            lat = coords[0][1];
+                        }
+                    }
+                }
+
+                // 3. Try from coordinates column (if exists)
+                if ((!lat || !lon) && sign.coordinates) {
+                    try {
+                        const coords = JSON.parse(sign.coordinates);
+                        if (Array.isArray(coords) && coords.length >= 2) {
+                            lon = coords[0];
+                            lat = coords[1];
+                        }
+                    } catch (e) {
+                        // Not JSON, try to parse as string
+                        const match = sign.coordinates.match(/[-+]?\d*\.\d+|\d+/g);
+                        if (match && match.length >= 2) {
+                            lon = parseFloat(match[0]);
+                            lat = parseFloat(match[1]);
+                        }
+                    }
+                }
+
+                if (lat !== null && lon !== null) {
+                    sign.coordinates = [lon, lat];
+                    sign.lat = lat.toString();
+                    sign.lon = lon.toString();
+
+                    // Process maxspeed
+                    if (sign.detection_type) {
+                        if (!sign.detection_type.toLowerCase().startsWith("speed_limit")) {
+                            sign.maxspeed = sign.detection_type;
+                        } else {
+                            const parts = sign.detection_type.toLowerCase().split("speed_limit_");
+                            sign.maxspeed = parts.length > 1 ? parts[1] : sign.detection_type;
+                        }
+                    }
+
+                    // Ensure angle is a number
+                    if (sign.angle) {
+                        sign.angle = parseFloat(sign.angle) || 0;
+                    } else {
+                        sign.angle = 0;
+                    }
+
+                    signs.push(sign);
+                } else {
+                    console.warn(`Skipping sign ${sign.id || 'unknown'} - no valid coordinates found`);
+                }
+            }
+
+            return signs;
+        }
+
+        // Process detection_type field
+        function processDetectionType(detectionType) {
+            if (!detectionType) return '';
+
+            if (!detectionType.toLowerCase().startsWith("speed_limit")) {
+                return detectionType;
+            }
+
+            // Extract speed limit value
+            const parts = detectionType.toLowerCase().split("speed_limit_");
+            if (parts.length > 1) {
+                return parts[1];
+            }
+            return detectionType;
+        }
+
+        // Process Signs CSV and combine with roads
+        document.getElementById('processSignsCSVBtn').addEventListener('click', async function() {
+            if (!processedRoadsGeoJSON && signsCsvData.length === 0) {
+                showStatus('Please upload CSV files first', 'error');
+                return;
+            }
+
+            setLoading(true);
+            showStatus('Processing signs and combining with roads...', 'info');
+
+            try {
+                combinedGeoJSON = await combineSignsWithRoads(signsCsvData, processedRoadsGeoJSON);
+                document.getElementById('downloadCombinedResultsBtn').disabled = false;
+                showStatus(`Combined ${signsCsvData.length} signs with roads data`, 'success');
+
+            } catch (error) {
+                showStatus(`Error processing signs: ${error.message}`, 'error');
+                console.error(error);
+            } finally {
+                setLoading(false);
+            }
+        });
+
+        // Generate signs SQL with WKT multipolygons for each country
+        function generateSignsSQL(countryQuadkeys) {
+            const currentDate = new Date();
+            currentDate.setDate(currentDate.getDate() - 2);
+            const formattedDate = currentDate.toLocaleDateString('en-CA');
+            const strFormattedDate = `'${formattedDate}'`;
+
+            // Get sorted countries
+            const sortedCountries = Object.keys(countryQuadkeys).sort();
+
+            // Build country-specific conditions with WKT multipolygons
+            const countryConditions = [];
+
+            for (const country of sortedCountries) {
+                const quadkeys = countryQuadkeys[country];
+
+                if (quadkeys.length === 0) continue;
+
+                // Generate WKT multipolygon for this country's quadkeys
+                const wktMultipolygon = generateMultipolygonWKT(quadkeys);
+
+                if (wktMultipolygon) {
+                    // Escape single quotes in WKT by doubling them
+                    const escapedWKT = wktMultipolygon.replace(/'/g, "''");
+
+                    const countryCondition = `(country in ('${country}')
+                    and st_intersects(
+                          st_point(lon, lat),
+                          st_geometryfromtext('${escapedWKT}')
+                       )
+                    )`;
+                    countryConditions.push(countryCondition);
+                }
+            }
+
+            if (countryConditions.length === 0) {
+                return '-- No quadkeys found for any country';
+            }
+
+            // Combine all country conditions with OR
+            let finalCondition = '';
+            if (countryConditions.length === 1) {
+                finalCondition = countryConditions[0];
+            } else {
+                finalCondition = '(' + countryConditions.join('\nor ') + '\n)';
+            }
+
+            if (currentProcessingMode === 'speed_limits') {
+                endFields = `((detection_type like ('%speed_limit%') and detection_type not like ('%road_marking%'))
+                    or detection_type like ('%city%')
+                    or detection_type like ('%end_of_speedlimit%')
+                    or detection_type like ('%end_general%')
+                    or detection_type like ('%motorway%')
+                    or detection_type like ('%residential_area%'))`;
+            } else if (currentProcessingMode === 'oneways'){
+                endFields = `detection_type in ('oneway','no_entrance','arrow_no_left','arrow_left','arrow_right','arrow_straight','arrow_left_ahead','arrow_right_ahead','arrow_no_right')`;
+            }
+
+            // Build complete signs query
+            const query = `select id, lon, lat, detection_type, angle, cluster_size, confidence, dt, supplementary_type, sub_type, is_electronic, from_tunnel, country from roads_rsd_production.source_v3_0_0_deduplicated_points
+                where dt = ${strFormattedDate}
+                and ${finalCondition}
+                and cluster_size > 10 and confidence > 0.1 and status <> 'Deleted'
+                and ${endFields}`;
+            return query;
+        }
+
+                function generateMultipolygonWKT(countryQuadkeys) {
+            const polygons = [];
+
+            for (const quadkey of countryQuadkeys) {
+                const bounds = quadkeyToBounds(quadkey);
+
+                // Create polygon for this quadkey (rectangle)
+                // WKT polygon format: ((west south, west north, east north, east south, west south))
+                const polygon = `((${bounds.west} ${bounds.south}, ${bounds.west} ${bounds.north}, ${bounds.east} ${bounds.north}, ${bounds.east} ${bounds.south}, ${bounds.west} ${bounds.south}))`;
+                polygons.push(polygon);
+            }
+
+            if (polygons.length === 0) {
+                return '';
+            }
+
+            // MULTIPOLYGON format: MULTIPOLYGON(((polygon1)), ((polygon2)), ...)
+            return `MULTIPOLYGON(${polygons.join(', ')})`;
+        }
+
+        // Combine signs with roads, sharing signs across border quadkeys but NOT sharing roads
+async function combineSignsWithRoads(signs, roadsGeoJSON) {
+    const combinedGeoJSON = {};
+
+    // Group signs by quadkey (signs are shared across countries)
+    const signsByQuadkey = new Map();
+
+    // First, assign signs to quadkeys based on coordinates
+    for (let signIndex = 0; signIndex < signs.length; signIndex++) {
+        const sign = signs[signIndex];
+        if (!sign.coordinates) continue;
+
+        const [signLng, signLat] = sign.coordinates;
+
+        // Find which quadkey this sign belongs to
+        let foundQuadkey = null;
+
+        // Check all quadkeys by their bounds
+        for (const [quadkey, countries] of quadkeyCountriesMap.entries()) {
+            const bounds = quadkeyToBounds(quadkey);
+            if (isPointInBounds(signLng, signLat, bounds)) {
+                foundQuadkey = quadkey;
+                break;
+            }
+        }
+
+        if (foundQuadkey) {
+            if (!signsByQuadkey.has(foundQuadkey)) {
+                signsByQuadkey.set(foundQuadkey, []);
+            }
+            signsByQuadkey.get(foundQuadkey).push(sign);
+        }
+
+        if (signIndex % 100 === 0) {
+            await new Promise(resolve => setTimeout(resolve, 0));
+        }
+    }
+
+    // Now combine: each country gets its own roads + shared signs for quadkeys
+    for (const [country, quadkeys] of Object.entries(roadsGeoJSON)) {
+        if (!combinedGeoJSON[country]) {
+            combinedGeoJSON[country] = {};
+        }
+
+        for (const [quadkey, roadCollection] of Object.entries(quadkeys)) {
+            if (!combinedGeoJSON[country][quadkey]) {
+                combinedGeoJSON[country][quadkey] = {
+                    type: 'FeatureCollection',
+                    features: []
+                };
+            }
+
+            // Add this country's roads (NOT shared)
+            combinedGeoJSON[country][quadkey].features.push(...roadCollection.features);
+
+            // Add shared signs for this quadkey (same signs for all countries)
+            const signsInQuadkey = signsByQuadkey.get(quadkey) || [];
+            for (const sign of signsInQuadkey) {
+                const signFeature = createSignFeature(sign, country, quadkey);
+                combinedGeoJSON[country][quadkey].features.push(signFeature);
+            }
+        }
+
+        // Also add signs for quadkeys that this country has, even if no roads
+        const countryQuadkeys = Object.keys(quadkeys);
+        for (const [quadkey, signsList] of signsByQuadkey.entries()) {
+            // If this country has this quadkey but no roads in it, still add signs
+            if (countryQuadkeys.includes(quadkey) ||
+                (quadkeyCountriesMap.has(quadkey) &&
+                 Array.from(quadkeyCountriesMap.get(quadkey)).includes(country))) {
+
+                if (!combinedGeoJSON[country][quadkey]) {
+                    combinedGeoJSON[country][quadkey] = {
+                        type: 'FeatureCollection',
+                        features: []
+                    };
+                }
+
+                // Add signs if not already added
+                const existingSignIds = new Set(
+                    combinedGeoJSON[country][quadkey].features
+                        .filter(f => f.properties.id && f.properties.id.startsWith('sign_'))
+                        .map(f => f.properties.id)
+                );
+
+                for (const sign of signsList) {
+                    if (!existingSignIds.has(sign.id)) {
+                        const signFeature = createSignFeature(sign, country, quadkey);
+                        combinedGeoJSON[country][quadkey].features.push(signFeature);
+                    }
+                }
+            }
+        }
+    }
+
+    const totalSigns = Array.from(signsByQuadkey.values()).reduce((sum, arr) => sum + arr.length, 0);
+    showStatus(`Shared ${totalSigns} signs across ${signsByQuadkey.size} quadkeys`, 'success');
+
+    return combinedGeoJSON;
+}
+
+        function isPointInBounds(lng, lat, bounds) {
+    return lng >= bounds.west && lng <= bounds.east &&
+           lat >= bounds.south && lat <= bounds.north;
+}
+
+function filterRoadTags(road) {
+    // Check if oneway
+    const isOneway = road.oneway === 'yes' || road.oneway === '1' || road.oneway === '-1' || road.oneway === 'true';
+
+    let filteredRoad = {
+        id: road.id || ''
+    };
+
+    if (currentProcessingMode === 'speed_limits') {
+        // Speed Limits mode - current functionality
+        filteredRoad = filterRoadTagsSpeedLimits(road, isOneway);
+    } else if (currentProcessingMode === 'oneways' || currentProcessingMode === 'here_oneways'){
+        // Oneways mode - simplified output
+        filteredRoad = filterRoadTagsOneways(road, isOneway);
+    }
+    return filteredRoad;
+}
+
+function filterRoadTagsSpeedLimits(road, isOneway) {
+    const filteredRoad = {
+        id: road.id || ''
+    };
+
+    // Keep only specified keys and remove any with "type" substring
+    const keysToCheck = Object.keys(road);
+
+    for (const key of keysToCheck) {
+        const lowerKey = key.toLowerCase();
+
+        // Skip if key contains "type" substring or other excluded patterns
+        if (lowerKey.includes('type') || lowerKey.includes('zone') || lowerKey.includes('correction') ||
+            lowerKey.includes('dt') || lowerKey.includes('advisory') || lowerKey.includes('source') ||
+            lowerKey.includes('country')) {
+            continue;
+        }
+
+        // Get the value and check if it's [DELETED]
+        let value = road[key];
+        if (value === '[DELETED]') {
+            value = '0';
+        }
+
+        // Always include these specific tags if they exist
+        if (lowerKey === 'oneway') {
+            filteredRoad.oneway = value;
+        }
+        else if (lowerKey === 'junction') {
+            filteredRoad.junction = value;
+        }
+        else if (lowerKey === 'highway') {
+            // Rename highway to FRC
+            filteredRoad.FRC = value;
+        }
+        // Include any tag with "maxspeed" substring
+        else if (lowerKey.startsWith('maxspeed')) {
+            filteredRoad[key] = value;
+        }
+    }
+
+    // Add oneway=no if oneway key doesn't exist
+    if (!filteredRoad.oneway) {
+        filteredRoad.oneway = isOneway ? isOneway : 'no';
+    }
+
+    // Add default maxspeed tags based on oneway status
+    if (!filteredRoad['maxspeed:conditional']) {
+        filteredRoad['maxspeed_conditional'] = '0';
+    }
+    if (!filteredRoad['maxspeed:variable']) {
+        filteredRoad['maxspeed:variable'] = '0';
+    }
+    if (!filteredRoad['maxspeed:hgv']) {
+        filteredRoad['maxspeed_hgv'] = '0';
+    }
+    if (!filteredRoad['maxspeed:hgv:conditional']) {
+        filteredRoad['maxspeed_hgv_conditional'] = '0';
+    }
+    if (!filteredRoad['maxspeed:trailer']) {
+        filteredRoad['maxspeed_trailer'] = '0';
+    }
+    if (isOneway) {
+        if (!filteredRoad.maxspeed) {
+            filteredRoad.maxspeed = '0';
+        }
+    } else {
+        // For bidirectional roads, add forward/backward tags if not present
+        if (!filteredRoad['maxspeed:forward']) {
+            filteredRoad['maxspeed:forward'] = '0';
+        }
+        if (!filteredRoad['maxspeed:backward']) {
+            filteredRoad['maxspeed:backward'] = '0';
+        }
+        if (!filteredRoad['maxspeed:forward:conditional']) {
+            filteredRoad['maxspeed_forward_conditional'] = '0';
+        }
+        if (!filteredRoad['maxspeed:backward:conditional']) {
+            filteredRoad['maxspeed_backward_conditional'] = '0';
+        }
+    }
+
+    return filteredRoad;
+}
+
+function filterRoadTagsOneways(road, isOneway) {
+    const filteredRoad = {
+        id: road.id || ''
+    };
+
+    // Only include these specific tags
+    if (road.oneway !== undefined) {
+        filteredRoad.oneway = road.oneway === '[DELETED]' ? '0' : road.oneway;
+    } else {
+        filteredRoad.oneway = isOneway ? isOneway : 'no';
+    }
+
+    if (road.junction !== undefined) {
+        filteredRoad.junction = road.junction === '[DELETED]' ? '0' : road.junction;
+    }
+
+    if (road.highway !== undefined) {
+        filteredRoad.highway = road.highway;
+    }
+    return filteredRoad;
+}
+
+                // Download processed roads GeoJSON
+        document.getElementById('downloadCSVResultsBtn').addEventListener('click', function() {
+            if (!processedRoadsGeoJSON || Object.keys(processedRoadsGeoJSON).length === 0) {
+                showStatus('No processed roads data available', 'error');
+                return;
+            }
+
+            // Create a zip file with organized GeoJSON files
+            const zip = new JSZip();
+
+            for (const [country, quadkeys] of Object.entries(processedRoadsGeoJSON)) {
+                const countryFolder = zip.folder(country);
+
+                for (const [quadkey, geojson] of Object.entries(quadkeys)) {
+                    if (geojson.features.length > 0) {
+                        const fileName = `${quadkey}.geojson`;
+                        countryFolder.file(fileName, JSON.stringify(geojson, null, 2));
+                    }
+                }
+            }
+
+            // Generate and download zip file
+            zip.generateAsync({ type: 'blob' }).then(function(content) {
+                const url = URL.createObjectURL(content);
+                const a = document.createElement('a');
+                a.href = url;
+                let currentDate = new Date();
+                let iso = currentDate.toISOString()
+                a.download = `roads_${currentProcessingMode}_${iso}.zip`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                console.log('Downloaded roads organized by country/quadkey');
+                showStatus(`Downloaded roads organized by country/quadkey`, 'success');
+            });
+        });
+
+                // Load JSZip library dynamically
+        function loadJSZip() {
+            return new Promise((resolve, reject) => {
+                if (typeof JSZip !== 'undefined') {
+                    resolve();
+                    return;
+                }
+
+                const script = document.createElement('script');
+                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        }
+
+        async function downloadCSVResults() {
+    if (!processedRoadsGeoJSON || Object.keys(processedRoadsGeoJSON).length === 0) {
+        showStatus('No processed roads data available', 'error');
+        return;
+    }
+
+    try {
+        await loadJSZip();
+        const zip = new JSZip();
+        let fileCount = 0;
+
+        // Process each country
+        for (const [country, quadkeys] of Object.entries(processedRoadsGeoJSON)) {
+            // Only process if we have features for this country
+            let hasFeatures = false;
+            for (const quadkey in quadkeys) {
+                if (quadkeys[quadkey].features.length > 0) {
+                    hasFeatures = true;
+                    break;
+                }
+            }
+
+            if (!hasFeatures) continue;
+
+            // Create folder for this country
+            const countryFolder = zip.folder(country);
+
+            // Add each quadkey's features for this country
+            for (const [quadkey, geojson] of Object.entries(quadkeys)) {
+                if (geojson.features.length > 0) {
+                    // Create file name with country code to make it clear
+                    const fileName = `${quadkey}_${country}.geojson`;
+                    countryFolder.file(fileName, JSON.stringify(geojson, null, 2));
+                    fileCount++;
+                }
+            }
+        }
+
+        // Generate and download zip file
+        zip.generateAsync({ type: 'blob' }).then(function(content) {
+            const url = URL.createObjectURL(content);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `roads_by_country_strict.zip`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            showStatus(`Downloaded ${fileCount} GeoJSON files organized by country`, 'success');
+        });
+
+    } catch (error) {
+        showStatus('Error creating zip file: ' + error.message, 'error');
+        console.error(error);
+    }
+}
 
     </script>
 </body>
