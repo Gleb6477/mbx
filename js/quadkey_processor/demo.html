@@ -427,6 +427,7 @@
             color: #666;
             font-weight: 600;
             transition: all 0.3s;
+            overflow-y: auto;
         }
 
         .tab.active {
@@ -635,6 +636,131 @@
         .card {
             margin-top: 20px;
         }
+
+        .filter-container {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #333;
+            max-width: 500px;
+        }
+
+        .filter-fieldset {
+            border: 2px solid #4a6ee0;
+            border-radius: 8px;
+            padding: 20px;
+            background-color: white;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        .filter-legend {
+            font-weight: bold;
+            color: #4a6ee0;
+            padding: 0 10px;
+            font-size: 1.2em;
+        }
+
+        .filter-section {
+            margin-bottom: 25px;
+        }
+
+        .filter-checkbox-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+            cursor: pointer;
+        }
+
+        .filter-options {
+            display: none;
+            margin-left: 28px;
+            padding-top: 5px;
+        }
+
+        .filter-date-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .filter-date-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 5px;
+        }
+
+        .filter-number-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .filter-number-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 5px;
+        }
+
+        .filter-checkbox-label {
+            font-weight: 500;
+            cursor: pointer;
+        }
+
+        .filter-checkbox {
+            margin-right: 8px;
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        .filter-date-input, .filter-number-input {
+            padding: 8px 12px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 0.9em;
+            flex-grow: 1;
+        }
+
+        .filter-date-input:focus, .filter-number-input:focus {
+            outline: none;
+            border-color: #4a6ee0;
+            box-shadow: 0 0 0 2px rgba(74, 110, 224, 0.2);
+        }
+
+        .filter-number-input {
+            max-width: 100px;
+        }
+
+        .filter-date-label, .filter-number-label {
+            min-width: 70px;
+            font-size: 0.9em;
+            color: #555;
+        }
+
+        .filter-instructions {
+            margin-top: 15px;
+            font-size: 0.9em;
+            color: #666;
+            font-style: italic;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+            border-left: 3px solid #4a6ee0;
+        }
+
+        .filter-divider {
+            height: 1px;
+            background-color: #eee;
+            margin: 10px 0;
+        }
+
+        .filter-date-input {
+            font-family: monospace;
+            letter-spacing: 0.5px;
+        }
+
     </style>
 </head>
 <body>
@@ -770,6 +896,67 @@
 
                 <!-- CSV Upload Section -->
                 <div id="csv-tab" class="tab-content">
+                    <div class="filter-container">
+                        <fieldset class="filter-fieldset">
+                            <legend class="filter-legend">Choose filters:</legend>
+
+                            <!-- Rave Edits Filter -->
+                            <div class="filter-section">
+                                <div class="filter-checkbox-row">
+                                    <input type="checkbox" id="rave-edits-checkbox" name="Rave edits" class="filter-checkbox" checked/>
+                                    <label for="rave-edits-checkbox" class="filter-checkbox-label">Rave edits</label>
+                                </div>
+                                <div class="filter-options" id="rave-edits-options">
+                                    <div class="filter-date-group">
+                                        <div class="filter-date-row">
+                                            <span class="filter-date-label">From:</span>
+                                            <input type="date" id="rave-edits-from" name="rave-edits-from" class="filter-date-input" placeholder="yyyy-mm-dd">
+                                        </div>
+                                        <div class="filter-date-row">
+                                            <span class="filter-date-label">To:</span>
+                                            <input type="date" id="rave-edits-to" name="rave-edits-to" class="filter-date-input" placeholder="yyyy-mm-dd">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="filter-divider"></div>
+
+<!--                            &lt;!&ndash; Traces Filter &ndash;&gt;-->
+<!--                            <div class="filter-section">-->
+<!--                                <div class="filter-checkbox-row">-->
+<!--                                    <input type="checkbox" id="traces-checkbox" name="Traces" class="filter-checkbox" checked/>-->
+<!--                                    <label for="traces-checkbox" class="filter-checkbox-label">Traces</label>-->
+<!--                                </div>-->
+<!--                                <div class="filter-options" id="traces-options">-->
+<!--                                    <div class="filter-date-group">-->
+<!--                                        <div class="filter-date-row">-->
+<!--                                            <span class="filter-date-label">From:</span>-->
+<!--                                            <input type="date" id="traces-from" name="traces-from" class="filter-date-input" placeholder="yyyy-mm-dd">-->
+<!--                                        </div>-->
+<!--                                        <div class="filter-date-row">-->
+<!--                                            <span class="filter-date-label">To:</span>-->
+<!--                                            <input type="date" id="traces-to" name="traces-to" class="filter-date-input" placeholder="yyyy-mm-dd">-->
+<!--                                        </div>-->
+<!--                                    </div>-->
+<!--                                    <div class="filter-number-group">-->
+<!--                                        <div class="filter-number-row">-->
+<!--                                            <span class="filter-number-label">Low FRC threshold:</span>-->
+<!--                                            <input type="number" id="traces-value1" name="traces-value1" class="filter-number-input"  placeholder="8">-->
+<!--                                        </div>-->
+<!--                                        <div class="filter-number-row">-->
+<!--                                            <span class="filter-number-label">High FRC threshold:</span>-->
+<!--                                            <input type="number" id="traces-value2" name="traces-value2" class="filter-number-input" placeholder="20">-->
+<!--                                        </div>-->
+<!--                                    </div>-->
+<!--                                </div>-->
+<!--                            </div>-->
+
+                            <div class="filter-instructions">
+                                Dates are shown in dd/mm/yyyy format.
+                            </div>
+                        </fieldset>
+                    </div>
                     <div class="csv-section">
                         <div class="input-group">
                             <label for="csvFile">Upload Roads CSV File</label>
@@ -819,15 +1006,13 @@
                             <button id="copyResultsBtn" class="secondary-btn" style="margin-left:20px" disabled>Copy Results</button>
                             <button id="copySqlResultsBtn" class="secondary-btn" style="margin-left:10px" disabled>Copy roads SQL</button>
                             <button id="copySignsSqlBtn" class="secondary-btn" style="margin-left:10px" disabled>Copy signs SQL</button>
-                            <button id="copyStats" class="secondary-btn" style="margin-left:10px">
-                                <i class="fas fa-chart-bar"></i> Calculate Statistics
-                            </button>
+<!--                            <button id="copyStats" class="secondary-btn" style="margin-left:10px">-->
+<!--                                <i class="fas fa-chart-bar"></i> Calculate Statistics-->
+<!--                            </button>-->
 <!--                            <div id="statsResults" class="mt-3"></div>-->
                         </div>
                     </div>
-                    <div class="results-content" id="resultsOutput">
-                        No results yet. Upload a route file and click "Calculate Quadkeys".
-                    </div>
+                    <div class="results-content" id="resultsOutput">No results yet. Upload a route file and click "Calculate Quadkeys".</div>
                 </div>
             </div>
         </div>
@@ -1280,7 +1465,7 @@ function downloadCSV(content, filename) {
                 }
 
                 // Update UI
-                updateAdminInfo(clickedFeature);
+                //updateAdminInfo(clickedFeature);
                 splitQuadkeysBtn.disabled = false;
                 currentHighlightName = clickedName;
 
@@ -1303,9 +1488,9 @@ function downloadCSV(content, filename) {
         }
 
         function updateAdminInfo(feature) {
-            selectedPolygonName.textContent = feature.properties.name;
-            selectedPolygonId.textContent = feature.properties.osm_id;
-            selectedAdminLevel.textContent = feature.properties.admin_level;
+            //selectedPolygonName.textContent = feature.properties.name;
+            //selectedPolygonId.textContent = feature.properties.osm_id;
+            //selectedAdminLevel.textContent = feature.properties.admin_level;
             adminInfo.style.display = 'block';
         }
 
@@ -1685,19 +1870,20 @@ function downloadCSV(content, filename) {
                 await loadJSZip();
                 const zip = new JSZip();
                 let fileCount = 0;
-                let csvContent = "QuadKey,Road Length (m),Sign Count,Total Features\n";
+                let csvContentForBuffer = "";
                 for (const [country, quadkeys] of Object.entries(combinedGeoJSON)) {
                     const countryFolder = zip.folder(country);
 
                     for (const [quadkey, geojson] of Object.entries(quadkeys)) {
                         if (geojson.features.length > 0) {
                             // Separate roads and signs
-                            const roadsFeatures = geojson.features.filter(f => f.geometry.type !== 'LineString');
+                            const roadsFeatures = geojson.features.filter(f => f.geometry.type === 'LineString');
                             const signsFeatures = geojson.features.filter(f => f.geometry.type === 'Point');
-
+                            const length = geojson.features.filter(f => f.geometry.type === 'LineString').reduce((sum, f) => sum + parseFloat(f.length), 0);
+                            console.log(length);
                             // Generate CSV
 
-                            csvContent += `${quadkey},${stats.roadLength.toFixed(2)},${signsFeatures}\n`;
+                            csvContentForBuffer += `${quadkey} ${length.toFixed(2)}\n`;
 
 
                             // Create combined file
@@ -1708,7 +1894,7 @@ function downloadCSV(content, filename) {
                     }
                 }
 
-                navigator.clipboard.writeText(f`${csvContent}`).then(() => {
+                navigator.clipboard.writeText(`${csvContentForBuffer}`).then(() => {
                     showStatus('Stats copied to clipboard!', 'success');
                 });
 
@@ -2081,8 +2267,8 @@ function downloadCSV(content, filename) {
                 });
             }
 
-            const statsEl = document.getElementById('statsDetails');
-            statsEl.textContent = `Found ${totalQuadkeys} quadkeys, ${borderQuadkeys} border quadkeys across ${totalCountries.size} countries`;
+<!--            const statsEl = document.getElementById('statsDetails');-->
+<!--            statsEl.textContent = `Found ${totalQuadkeys} quadkeys, ${borderQuadkeys} border quadkeys across ${totalCountries.size} countries`;-->
         }
 
         // Show status message
@@ -2300,11 +2486,6 @@ function downloadCSV(content, filename) {
             map.fitBounds([[bounds.xMin, bounds.yMin], [bounds.xMax, bounds.yMax]], {
                 padding: 50
             });
-
-            document.getElementById('routeInfo').style.display = 'block';
-            document.getElementById('routeDetails').textContent =
-                `Distance: ${(totalDistance / 1000).toFixed(2)} km, Waypoints: ${waypointCount}, Legs: ${route.legs.length}`;
-
             clearQuadkeyLayers();
             document.getElementById('resultsOutput').textContent =
                 'No results yet. Click "Calculate Quadkeys" to process this route.';
@@ -2312,7 +2493,6 @@ function downloadCSV(content, filename) {
             document.getElementById('copySqlResultsBtn').disabled = true;
             document.getElementById('copySignsSqlBtn').disabled = true;
             document.getElementById('downloadGeoJSONBtn').disabled = true;
-            document.getElementById('statsInfo').style.display = 'none';
             document.getElementById('countryControlsContainer').style.display = 'none';
             document.getElementById('copyWktBtn').style.display = 'block';
 
@@ -2391,9 +2571,8 @@ function downloadCSV(content, filename) {
                 updateDisplayAndVisualization();
 
                 // Show statistics
-                document.getElementById('statsInfo').style.display = 'block';
-                document.getElementById('statsDetails').textContent =
-                    `Found ${stats.totalQuadkeys} quadkeys, ${stats.borderQuadkeys} border quadkeys in ${processingTime.toFixed(1)}s`;
+<!--                document.getElementById('statsDetails').textContent =-->
+<!--                    `Found ${stats.totalQuadkeys} quadkeys, ${stats.borderQuadkeys} border quadkeys in ${processingTime.toFixed(1)}s`;-->
 
                 showStatus(`Found ${stats.totalQuadkeys} quadkeys across ${Object.keys(countryQuadkeys).length} countries`, 'success');
 
@@ -2688,7 +2867,9 @@ function downloadCSV(content, filename) {
 
                     const sourceId = `quadkey-${quadkey}`;
                     const layerId = `quadkey-layer-${quadkey}`;
-
+                    if (map.getSource(sourceId) !== 'undefined'){
+                        continue;
+                    }
                     // Add source
                     map.addSource(sourceId, {
                         type: 'geojson',
@@ -3032,7 +3213,7 @@ function downloadCSV(content, filename) {
 <!--            }-->
 
             // Build the complete query
-            query = `select id, tags, geometry_wkt, metadata_str['iso:3166_1'] as country
+            query = `select id, tags, geometry_wkt, metadata_str['iso:3166_1'] as country, (length_meters)/1000 as length
                 from roads_production.road_pipeline_corrections_v1_1_0_metadata_corrected_osm_roads_enriched
                 where dt = ${strFormattedDate}
                 and ${finalCountryCondition}
@@ -3961,7 +4142,7 @@ function downloadCSV(content, filename) {
             }
 
             // Build the complete query with appropriate fields based on mode
-            let selectFields = `select id, tags, geometry_wkt, metadata_str['iso:3166_1'] as country`;
+            let selectFields = `select id, tags, geometry_wkt, metadata_str['iso:3166_1'] as country, (length_meters)/1000 as length`;
             let endFields = '';
             if (currentProcessingMode === 'speed_limits' || currentProcessingMode === 'here_oneways') {
                 endFields = `tags['highway'] in ('motorway', 'trunk', 'motorway_link', 'trunk_link', 'primary', 'primary_link', 'secondary', 'secondary_link', 'tertiary', 'unclassified', 'residential', 'tertiary_link')`;
@@ -4063,7 +4244,8 @@ function downloadCSV(content, filename) {
                     tags: values[headers.indexOf('\"tags\"')] || '{}',
                     geometry: values[headers.indexOf('\"geometry_wkt\"')] || '',
                     // Try to find country in any column
-                    country: ''
+                    country: '',
+                    length: values[headers.indexOf('\"length\"')] || '',
                 };
 
                 // Look for country in metadata_str['iso:3166_1'] column or similar
@@ -4172,7 +4354,7 @@ function downloadCSV(content, filename) {
                     currentValue += char;
                 }
             }
-
+            currentValue = currentValue.replace('\r', '');
             values.push(currentValue);
             return values;
         }
@@ -4217,7 +4399,9 @@ function downloadCSV(content, filename) {
         document.getElementById('downloadCSVResultsBtn').disabled = false;
 
         const modeName = currentProcessingMode === 'speed_limits' ? 'Speed Limits' : 'Oneways';
-        showStatus(`Processed ${csvRoadsData.length} roads in ${modeName} mode`, 'success');
+        //showStatus(`Processed ${csvRoadsData.length} roads in ${modeName} mode`, 'success');
+
+        //showStatus(`Processing complete: 100%\nFiltered ${(rave_edit_filter_count/roads.length) * 100} roads due to rave_edits`, 'success');
 
     } catch (error) {
         showStatus(`Error processing CSV: ${error.message}`, 'error');
@@ -4227,10 +4411,28 @@ function downloadCSV(content, filename) {
     }
 });
 
+    function roadIsFiltered(road){
+        let rave_edits_filter = document.getElementById('rave-edits-checkbox');
+        let traces_filter = document.getElementById('traces-checkbox');
+        let from = document.getElementById("rave-edits-from").value;
+        let to = document.getElementById("rave-edits-to").value;
+
+        if (rave_edits_filter.checked){
+            if (('oneway:source' in road) && (road['oneway:source'] === 'rave_edit')){
+                let edit_dt = new Date(road['oneway:source:dt']).toISOString().split('T')[0];
+                if ((edit_dt >= from) && (edit_dt <= to)){
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
     let quadKeyStats = {}
 
         // Process CSV roads and create GeoJSON organized by country/quadkey (roads NOT shared)
 async function processRoadsCSV(roads, zoomLevel) {
+    let rave_edit_filter_count = 0;
     quadKeyStats = {}
     // Create a map of quadkey to countries for faster lookup
     const quadkeyToCountries = new Map();
@@ -4253,6 +4455,12 @@ async function processRoadsCSV(roads, zoomLevel) {
 
     for (let roadIndex = 0; roadIndex < roads.length; roadIndex++) {
         const road = roads[roadIndex];
+        if (currentProcessingMode === 'oneways'){
+            if (roadIsFiltered(road)){
+                rave_edit_filter_count++;
+                continue;
+            }
+        }
         if (!road.coordinates || road.coordinates.length < 2) continue;
 
         // Get the road's country from metadata
@@ -4311,7 +4519,8 @@ async function processRoadsCSV(roads, zoomLevel) {
                     geometry: {
                         type: 'LineString',
                         coordinates: road.coordinates
-                    }
+                    },
+                    length: road.length
                 };
                 geoJSONByCountryQuadkey[roadCountry][bestQuadkey].features.push(feature);
             }
@@ -4329,9 +4538,10 @@ async function processRoadsCSV(roads, zoomLevel) {
             await new Promise(resolve => setTimeout(resolve, 0));
         }
     }
-
-    showStatus(`Processing complete: 100%`, 'success');
-    showStatus(`Assigned ${assignedCount} roads to quadkeys (${roads.length - assignedCount} not assigned)`, 'success');
+    //console.log("Filtered ", (rave_edit_filter_count/roads.length).toFixed(1) * 100, ' % roads due to rave_edits');
+    let filtered = parseFloat(rave_edit_filter_count/roads.length).toFixed(3) * 100;
+    showStatus(`Processing complete: 100%\nFiltered ${rave_edit_filter_count} (${filtered} %) roads due to rave_edits`, 'success');
+    //showStatus(`Assigned ${assignedCount} roads to quadkeys (${roads.length - assignedCount} not assigned)`, 'success');
 
     return geoJSONByCountryQuadkey;
 }
@@ -4835,6 +5045,7 @@ function filterRoadTagsSpeedLimits(road, isOneway) {
 }
 
 function filterRoadTagsOneways(road, isOneway) {
+
     const filteredRoad = {
         id: road.id || ''
     };
@@ -4893,6 +5104,54 @@ function filterRoadTagsOneways(road, isOneway) {
                 showStatus(`Downloaded roads organized by country/quadkey`, 'success');
             });
         });
+
+        (function() {
+    // Initialize when the DOM is ready
+    document.addEventListener('DOMContentLoaded', function() {
+        // Get current date
+        const today = new Date();
+        const todayStr = today.toISOString().split('T')[0];
+
+        // Calculate date 2 months ago
+        const twoMonthsAgo = new Date();
+        twoMonthsAgo.setMonth(twoMonthsAgo.getMonth() - 2);
+        const twoMonthsAgoStr = twoMonthsAgo.toISOString().split('T')[0];
+
+        // Set default date values in yyyy-mm-dd format
+        document.getElementById('rave-edits-from').value = twoMonthsAgoStr;
+        document.getElementById('rave-edits-to').value = todayStr;
+<!--        document.getElementById('traces-from').value = twoMonthsAgoStr;-->
+<!--        document.getElementById('traces-to').value = todayStr;-->
+
+<!--        // Set default number values-->
+<!--        document.getElementById('traces-value1').value = 8;-->
+<!--        document.getElementById('traces-value2').value = 20;-->
+
+        // Toggle filter options visibility based on checkbox state
+        function setupFilterToggle(checkboxId, optionsId) {
+            const checkbox = document.getElementById(checkboxId);
+            const options = document.getElementById(optionsId);
+
+            function updateOptionsVisibility() {
+                if (checkbox.checked) {
+                    options.style.display = 'block';
+                } else {
+                    options.style.display = 'none';
+                }
+            }
+
+            // Initial state
+            updateOptionsVisibility();
+
+            // Update when checkbox changes
+            checkbox.addEventListener('change', updateOptionsVisibility);
+        }
+
+        // Setup toggling for each filter
+        setupFilterToggle('rave-edits-checkbox', 'rave-edits-options');
+        setupFilterToggle('traces-checkbox', 'traces-options');
+    });
+})();
 
                 // Load JSZip library dynamically
         function loadJSZip() {
